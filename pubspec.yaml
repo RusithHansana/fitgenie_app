@@ -54,6 +54,7 @@ dev_dependencies:
 
   # Linting
   flutter_lints: ^5.0.0
+  flutter_native_splash: ^2.4.7
 
 flutter:
   uses-material-design: true
@@ -65,5 +66,12 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path_android: "assets/icons/app_icon_android.png"
-  image_path_ios: "assets/icons/app_icon_ios.png"
+  image_path_android: assets/icons/app_icon_android.png
+  image_path_ios: assets/icons/app_icon_ios.png
+
+flutter_native_splash:
+  color: "#F97316"
+  image: assets/icons/splash.png
+  android: true
+  ios: true
+  web: false
