@@ -309,6 +309,10 @@ class AppStrings {
       'You\'re offline. Changes will sync when connected.';
 
   // Validation errors
+  static const String errorAlphabeticOnly =
+      'This field accepts alphabetic characters only';
+  static const String errorNumericOnly =
+      'This field accepts numeric characters only';
   static const String errorInvalidAge = 'Please enter a valid age (13-120)';
   static const String errorInvalidWeight =
       'Please enter a valid weight (30-500)';
