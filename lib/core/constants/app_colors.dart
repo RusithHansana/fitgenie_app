@@ -174,6 +174,16 @@ class AppColors {
   static const Color dividerDark = Color(0x33FFFFFF);
 
   // ============================================================================
+  // SHADOW COLORS
+  // ============================================================================
+
+  /// Shadow color - light mode
+  static const Color shadowLight = Color(0x1F000000);
+
+  /// Shadow color - dark mode
+  static const Color shadowDark = Color(0x3D000000);
+
+  // ============================================================================
   // OVERLAY COLORS
   // ============================================================================
 
