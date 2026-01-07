@@ -1,5 +1,6 @@
 import 'package:fitgenie_app/core/constants/app_sizes.dart';
 import 'package:fitgenie_app/core/extensions/context_extensions.dart';
+import 'package:fitgenie_app/shared/providers/connectivity_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -55,12 +56,7 @@ class OfflineBanner extends ConsumerWidget {
     // This would be: final isOnline = ref.watch(isOnlineProvider);
     // We'll add a comment for now since the provider file comes next
 
-    // TODO: Uncomment when connectivity_provider.dart is created
-    // final isOnline = ref.watch(isOnlineProvider);
-
-    // Temporary fallback - always show for demonstration
-    // This will be replaced when provider is available
-    final isOnline = true; // Change to ref.watch(isOnlineProvider) later
+    final isOnline = ref.watch(isOnlineProvider);
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
