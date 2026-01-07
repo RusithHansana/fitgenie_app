@@ -321,6 +321,10 @@ class AppStrings {
   static const String errorNoGoalSelected = 'Please select a fitness goal';
   static const String errorNoEquipmentSelected = 'Please select your equipment';
 
+  // Generic errors
+  static const String errorGeneric =
+      'An unexpected error occurred. Please try again later or contact support.';
+
   // ============================================================================
   // SUCCESS MESSAGES
   // ============================================================================
