@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'sync_queue.dart';
 import 'dart:io';
 
 /// Centralized Hive service for local storage initialization and box management.
@@ -104,7 +105,7 @@ class HiveService {
       // Sync queue adapters (typeIds 30-39)
       if (!Hive.isAdapterRegistered(30)) {
         // SyncQueueItemAdapter registration will be added when model is generated
-        // Hive.registerAdapter(SyncQueueItemAdapter());
+        Hive.registerAdapter(SyncQueueItemAdapter());
       }
 
       // Open all required boxes
