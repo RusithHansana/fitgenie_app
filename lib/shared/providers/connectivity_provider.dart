@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -45,6 +46,119 @@ part 'connectivity_provider.g.dart';
 /// - Generates connectivity_provider.g.dart via build_runner
 /// - StreamProvider automatically disposes stream subscription
 /// - Provider is auto-dispose to clean up when not in use
+
+/// Wrapper class providing connectivity state for services requiring
+/// explicit dependency injection.
+///
+/// This class bridges the gap between Riverpod's reactive providers and
+/// traditional service classes that need direct access to connectivity state.
+/// It's designed for use with services like [SyncService] that manage their
+/// own lifecycle and subscriptions.
+///
+/// Usage in services:
+/// ```dart
+/// class SyncService {
+///   final ConnectivityProvider _connectivityProvider;
+///
+///   void initialize() {
+///     _connectivityProvider.isOnlineStream.listen((isOnline) {
+///       if (isOnline) syncPendingChanges();
+///     });
+///   }
+/// }
+/// ```
+///
+/// This pattern follows the architecture's hybrid approach:
+/// - Riverpod providers for reactive state (@riverpod annotations)
+/// - Service classes for stateful business logic (with initialize/dispose)
+class ConnectivityProvider {
+  final Connectivity _connectivity;
+  final StreamController<bool> _isOnlineController;
+  StreamSubscription<ConnectivityResult>? _subscription;
+
+  ConnectivityProvider()
+    : _connectivity = Connectivity(),
+      _isOnlineController = StreamController<bool>.broadcast() {
+    _initialize();
+  }
+
+  /// Initializes connectivity monitoring and starts streaming online state.
+  void _initialize() {
+    // Listen to connectivity changes and convert to boolean
+    _subscription = _connectivity.onConnectivityChanged.listen((result) {
+      _isOnlineController.add(result != ConnectivityResult.none);
+    });
+
+    // Get initial connectivity state
+    _connectivity.checkConnectivity().then((result) {
+      _isOnlineController.add(result != ConnectivityResult.none);
+    });
+  }
+
+  /// Stream of boolean values indicating online/offline state.
+  ///
+  /// Emits true when device has any network connection, false otherwise.
+  /// This stream is broadcast, allowing multiple listeners.
+  Stream<bool> get isOnlineStream => _isOnlineController.stream;
+
+  /// Current online state (synchronous access).
+  ///
+  /// Returns true if device currently has network connection.
+  /// Note: This performs a connectivity check and may be slightly stale.
+  bool get isOnline {
+    // This will be updated by the stream, but we provide a fallback
+    // In practice, consumers should use the stream or check asynchronously
+    return _isOnlineController.hasListener && !_isOnlineController.isClosed;
+  }
+
+  /// Checks current connectivity asynchronously.
+  ///
+  /// Returns true if device has any network connection.
+  /// Use this for one-time checks when you need the most up-to-date state.
+  Future<bool> checkConnectivity() async {
+    final result = await _connectivity.checkConnectivity();
+    return result != ConnectivityResult.none;
+  }
+
+  /// Disposes resources and cancels connectivity subscription.
+  ///
+  /// Call this when the provider is no longer needed to prevent memory leaks.
+  void dispose() {
+    _subscription?.cancel();
+    _isOnlineController.close();
+  }
+}
+
+/// Provides a [ConnectivityProvider] instance for services requiring
+/// connectivity monitoring.
+///
+/// This provider creates a singleton instance that can be injected into
+/// services like [SyncService] via their constructors.
+///
+/// Usage:
+/// ```dart
+/// @riverpod
+/// SyncService syncService(SyncServiceRef ref) {
+///   return SyncService(
+///     firestore: ref.watch(firestoreProvider),
+///     syncQueue: ref.watch(syncQueueProvider),
+///     connectivityProvider: ref.watch(connectivityProviderInstanceProvider),
+///   );
+/// }
+/// ```
+@Riverpod(keepAlive: true)
+ConnectivityProvider connectivityProviderInstance(
+  ConnectivityProviderInstanceRef ref,
+) {
+  final provider = ConnectivityProvider();
+
+  // Ensure proper cleanup when provider is disposed
+  ref.onDispose(() {
+    provider.dispose();
+  });
+
+  return provider;
+}
 
 /// Streams the current connectivity state.
 ///
