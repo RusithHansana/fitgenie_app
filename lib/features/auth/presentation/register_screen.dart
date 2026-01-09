@@ -1,4 +1,5 @@
 import 'package:fitgenie_app/core/constants/app_colors.dart';
+import 'package:fitgenie_app/core/constants/app_strings.dart';
 import 'package:fitgenie_app/core/extensions/context_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,7 +45,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     // Validate terms acceptance
     if (!_acceptedTerms) {
       setState(() {
-        _errorMessage = 'Please accept the Terms of Service to continue.';
+        _errorMessage = AppStrings.errorTermsAcceptanceRequired;
       });
       return;
     }
@@ -83,14 +84,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     } catch (e) {
       // Unexpected error
       setState(() {
-        _errorMessage = 'An unexpected error occurred. Please try again.';
+        _errorMessage = AppStrings.errorGeneric;
         _isLoading = false;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('An unexpected error occurred.'),
+            content: const Text(AppStrings.errorGeneric),
             backgroundColor: context.colorScheme.error,
           ),
         );
@@ -161,7 +162,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                     // Title
                     Text(
-                      'Create Account',
+                      AppStrings.registerTitle,
                       textAlign: TextAlign.center,
                       style: context.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -171,7 +172,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                     // Subtitle
                     Text(
-                      'Start your personalized fitness journey',
+                      AppStrings.registerSubtitle,
                       textAlign: TextAlign.center,
                       style: context.textTheme.bodyMedium?.copyWith(
                         color: context.colorScheme.onSurfaceVariant,
@@ -228,17 +229,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 color: context.colorScheme.onSurfaceVariant,
                               ),
                               children: [
-                                const TextSpan(text: 'I agree to the '),
+                                const TextSpan(
+                                  text: AppStrings.termsAcceptancePrefix,
+                                ),
                                 TextSpan(
-                                  text: 'Terms of Service',
+                                  text: AppStrings.termsOfService,
                                   style: TextStyle(
                                     color: context.colorScheme.primary,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const TextSpan(text: ' and '),
+                                const TextSpan(text: AppStrings.termsConnector),
                                 TextSpan(
-                                  text: 'Privacy Policy',
+                                  text: AppStrings.privacyPolicy,
                                   style: TextStyle(
                                     color: context.colorScheme.primary,
                                     fontWeight: FontWeight.w600,
@@ -265,7 +268,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Already have an account? ',
+                      AppStrings.messageAlreadyHaveAccount,
                       style: context.textTheme.bodyMedium?.copyWith(
                         color: context.colorScheme.onSurfaceVariant,
                       ),
@@ -273,7 +276,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     TextButton(
                       onPressed: _isLoading ? null : () => context.go('/login'),
                       child: Text(
-                        'Sign in',
+                        AppStrings.buttonSignIn,
                         style: context.textTheme.bodyMedium?.copyWith(
                           color: context.colorScheme.primary,
                           fontWeight: FontWeight.w600,

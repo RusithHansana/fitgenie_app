@@ -1,4 +1,5 @@
 import 'package:fitgenie_app/core/constants/app_colors.dart';
+import 'package:fitgenie_app/core/constants/app_strings.dart';
 import 'package:fitgenie_app/core/extensions/context_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,14 +76,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       // Unexpected error
       setState(() {
-        _errorMessage = 'An unexpected error occurred. Please try again.';
+        _errorMessage = AppStrings.errorGeneric;
         _isLoading = false;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('An unexpected error occurred.'),
+            content: const Text(AppStrings.errorGeneric),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -155,7 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     // Welcome text
                     Text(
-                      'Welcome Back',
+                      AppStrings.loginTitle,
                       textAlign: TextAlign.center,
                       style: context.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -165,7 +166,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     // Subtitle
                     Text(
-                      'Sign in to continue your fitness journey',
+                      AppStrings.loginSubtitle,
                       textAlign: TextAlign.center,
                       style: context.textTheme.bodyMedium?.copyWith(
                         color: context.colorScheme.onSurfaceVariant,
@@ -198,7 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ? null
                         : () => context.go('/forgot-password'),
                     child: Text(
-                      'Forgot password?',
+                      AppStrings.buttonForgotPassword,
                       style: context.textTheme.bodyMedium?.copyWith(
                         color: context.colorScheme.primary,
                         fontWeight: FontWeight.w500,
@@ -214,7 +215,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Don\'t have an account? ',
+                      AppStrings.messageDontHaveAccount,
                       style: context.textTheme.bodyMedium?.copyWith(
                         color: context.colorScheme.onSurfaceVariant,
                       ),
@@ -224,7 +225,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ? null
                           : () => context.go('/register'),
                       child: Text(
-                        'Sign up',
+                        AppStrings.buttonSignUp,
                         style: context.textTheme.bodyMedium?.copyWith(
                           color: context.colorScheme.primary,
                           fontWeight: FontWeight.w600,

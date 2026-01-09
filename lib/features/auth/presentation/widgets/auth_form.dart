@@ -1,3 +1,4 @@
+import 'package:fitgenie_app/core/constants/app_strings.dart';
 import 'package:fitgenie_app/core/extensions/context_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:fitgenie_app/shared/widgets/app_text_field.dart';
@@ -147,8 +148,8 @@ class _AuthFormState extends State<AuthForm> {
           // Email field
           AppTextField(
             controller: _emailController,
-            label: 'Email',
-            hint: 'Enter your email',
+            label: AppStrings.labelEmail,
+            hint: AppStrings.hintEnterEmail,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             enabled: !widget.isLoading,
@@ -174,8 +175,10 @@ class _AuthFormState extends State<AuthForm> {
           // Password field
           AppTextField(
             controller: _passwordController,
-            label: 'Password',
-            hint: isLogin ? 'Enter your password' : 'Create a password',
+            label: AppStrings.labelPassword,
+            hint: isLogin
+                ? AppStrings.hintEnterPassword
+                : AppStrings.hintCreatePassword,
             obscureText: true,
             textInputAction: TextInputAction.done,
             enabled: !widget.isLoading,
@@ -207,7 +210,7 @@ class _AuthFormState extends State<AuthForm> {
             Padding(
               padding: const EdgeInsets.only(left: 4),
               child: Text(
-                'Password must be at least 8 characters',
+                AppStrings.hintPasswordRequirements,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -220,7 +223,7 @@ class _AuthFormState extends State<AuthForm> {
           AppButton(
             onPressed: widget.isLoading ? null : _handleSubmit,
             isLoading: widget.isLoading,
-            label: isLogin ? 'Login' : 'Register',
+            label: isLogin ? AppStrings.buttonLogin : AppStrings.buttonRegister,
           ),
         ],
       ),

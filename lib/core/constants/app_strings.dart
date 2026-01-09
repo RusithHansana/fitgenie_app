@@ -30,6 +30,17 @@ class AppStrings {
   static const String loginTitle = 'Welcome Back';
   static const String registerTitle = 'Create Account';
   static const String forgotPasswordTitle = 'Reset Password';
+  static const String forgotPasswordEmailSentTitle = 'Email Sent!';
+
+  // Screen subtitles
+  static const String loginSubtitle =
+      'Sign in to continue your fitness journey';
+  static const String registerSubtitle =
+      'Start your personalized fitness journey';
+  static const String forgotPasswordEnterEmailSubtitle =
+      'Enter your email to receive a password reset link';
+  static const String forgotPasswordCheckInboxSubtitle =
+      'Check your inbox for password reset instructions';
 
   // Labels
   static const String labelEmail = 'Email';
@@ -37,26 +48,51 @@ class AppStrings {
   static const String labelConfirmPassword = 'Confirm Password';
   static const String labelName = 'Name';
 
-  // Placeholders
+  // Placeholders and hints
   static const String placeholderEmail = 'your.email@example.com';
   static const String placeholderPassword = '••••••••';
   static const String placeholderName = 'John Doe';
+  static const String hintEnterEmail = 'Enter your email';
+  static const String hintEnterPassword = 'Enter your password';
+  static const String hintCreatePassword = 'Create a password';
 
   // Buttons
   static const String buttonLogin = 'Login';
-  static const String buttonRegister = 'Create Account';
+  static const String buttonRegister = 'Register';
   static const String buttonLogout = 'Logout';
-  static const String buttonForgotPassword = 'Forgot Password?';
+  static const String buttonForgotPassword = 'Forgot password?';
   static const String buttonResetPassword = 'Reset Password';
   static const String buttonSendResetLink = 'Send Reset Link';
+  static const String buttonReturnToLogin = 'Return to Login';
+  static const String buttonSignIn = 'Sign in';
+  static const String buttonSignUp = 'Sign up';
 
   // Messages
-  static const String messageAlreadyHaveAccount = 'Already have an account?';
-  static const String messageDontHaveAccount = "Don't have an account?";
+  static const String messageAlreadyHaveAccount = 'Already have an account? ';
+  static const String messageDontHaveAccount = "Don't have an account? ";
   static const String messageResetPasswordSent =
       'Password reset link sent to your email';
   static const String messageLoginSuccess = 'Welcome back!';
   static const String messageRegisterSuccess = 'Account created successfully!';
+
+  // Forgot Password specific messages
+  static const String forgotPasswordResetLinkSentPrefix =
+      'We\'ve sent a password reset link to:';
+  static const String forgotPasswordInstructions =
+      'Please check your inbox and follow the instructions to reset your password.';
+  static const String forgotPasswordSpamFolderHelp =
+      'If you don\'t receive an email within a few minutes, '
+      'check your spam folder or try again.';
+
+  // Terms and Privacy
+  static const String termsAcceptancePrefix = 'I agree to the ';
+  static const String termsOfService = 'Terms of Service';
+  static const String termsConnector = ' and ';
+  static const String privacyPolicy = 'Privacy Policy';
+
+  // Validation hints
+  static const String hintPasswordRequirements =
+      'Password must be at least 8 characters';
 
   // ============================================================================
   // ONBOARDING
@@ -282,6 +318,10 @@ class AppStrings {
   static const String errorUserNotFound = 'No account found with this email';
   static const String errorEmailInUse = 'This email is already registered';
   static const String errorRequiredField = 'This field is required';
+  static const String errorSendResetFailed =
+      'Failed to send reset email. Please try again.';
+  static const String errorTermsAcceptanceRequired =
+      'Please accept the Terms of Service to continue.';
 
   // Network errors
   static const String errorNoConnection =

@@ -105,14 +105,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     } catch (e) {
       // Unexpected error
       setState(() {
-        _errorMessage = 'Failed to send reset email. Please try again.';
+        _errorMessage = AppStrings.errorSendResetFailed;
         _isLoading = false;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('An unexpected error occurred.'),
+            content: const Text(AppStrings.errorGeneric),
             backgroundColor: context.colorScheme.error,
           ),
         );
@@ -162,7 +162,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
                     // Title
                     Text(
-                      _emailSent ? 'Email Sent!' : 'Reset Password',
+                      _emailSent
+                          ? AppStrings.forgotPasswordEmailSentTitle
+                          : AppStrings.forgotPasswordTitle,
                       textAlign: TextAlign.center,
                       style: context.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -173,8 +175,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     // Subtitle
                     Text(
                       _emailSent
-                          ? 'Check your inbox for password reset instructions'
-                          : 'Enter your email to receive a password reset link',
+                          ? AppStrings.forgotPasswordCheckInboxSubtitle
+                          : AppStrings.forgotPasswordEnterEmailSubtitle,
                       textAlign: TextAlign.center,
                       style: context.textTheme.bodyMedium?.copyWith(
                         color: context.colorScheme.onSurfaceVariant,
@@ -226,8 +228,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         // Email field
                         AppTextField(
                           controller: _emailController,
-                          label: 'Email',
-                          hint: 'Enter your email',
+                          label: AppStrings.labelEmail,
+                          hint: AppStrings.hintEnterEmail,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.done,
                           enabled: !_isLoading,
@@ -241,7 +243,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         AppButton(
                           onPressed: _isLoading ? null : _handleResetPassword,
                           isLoading: _isLoading,
-                          label: 'Send Reset Link',
+                          label: AppStrings.buttonSendResetLink,
                         ),
                       ],
                     ),
@@ -269,7 +271,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'We\'ve sent a password reset link to:',
+                          AppStrings.forgotPasswordResetLinkSentPrefix,
                           textAlign: TextAlign.center,
                           style: context.textTheme.bodyMedium?.copyWith(
                             color: context.colorScheme.onSurfaceVariant,
@@ -286,7 +288,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Please check your inbox and follow the instructions to reset your password.',
+                          AppStrings.forgotPasswordInstructions,
                           textAlign: TextAlign.center,
                           style: context.textTheme.bodySmall?.copyWith(
                             color: context.colorScheme.onSurfaceVariant,
@@ -300,7 +302,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   // Return to login button
                   AppButton(
                     onPressed: () => context.go('/login'),
-                    label: 'Return to Login',
+                    label: AppStrings.buttonReturnToLogin,
                   ),
                 ],
 
@@ -326,8 +328,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'If you don\'t receive an email within a few minutes, '
-                            'check your spam folder or try again.',
+                            AppStrings.forgotPasswordSpamFolderHelp,
                             style: context.textTheme.bodySmall?.copyWith(
                               color: context.colorScheme.onSurfaceVariant,
                             ),
