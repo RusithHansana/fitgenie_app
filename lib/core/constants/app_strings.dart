@@ -348,6 +348,18 @@ class AppStrings {
   static const String errorOfflineMode =
       'You\'re offline. Changes will sync when connected.';
 
+  // Onboarding repository errors
+  static const String errorSaveProfileFailed =
+      'Failed to save profile. Please try again.';
+  static const String errorLoadProfileFailed =
+      'Failed to load profile. Please try again.';
+  static const String errorDeleteProfileFailed =
+      'Failed to delete profile. Please try again.';
+  static const String errorClearCacheFailed =
+      'Failed to clear cache. Please try again.';
+  static const String errorCompleteOnboardingFailed =
+      'Failed to complete onboarding. Please try again.';
+
   // Validation errors
   static const String errorAlphabeticOnly =
       'This field accepts alphabetic characters only';
