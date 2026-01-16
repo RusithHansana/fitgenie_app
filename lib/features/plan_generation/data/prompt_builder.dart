@@ -1,5 +1,6 @@
 import 'package:fitgenie_app/features/onboarding/domain/user_profile.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
+import 'package:fitgenie_app/core/constants/dietary_options.dart';
 
 import '../../../core/utils/formatters.dart';
 
