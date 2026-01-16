@@ -7,7 +7,8 @@ import 'package:fitgenie_app/features/plan_generation/data/plan_remote_datasourc
 import 'package:fitgenie_app/features/plan_generation/data/plan_repository.dart';
 import 'package:fitgenie_app/features/auth/auth_providers.dart';
 import 'package:fitgenie_app/features/onboarding/onboarding_providers.dart';
-import 'package:fitgenie_app/shared/providers/firebase_providers.dart';
+import 'package:fitgenie_app/shared/providers/firebase_providers.dart'
+    hide currentUserIdProvider;
 
 part 'plan_providers.g.dart';
 
@@ -155,8 +156,7 @@ Future<WeeklyPlan> generatePlan(GeneratePlanRef ref) async {
   }
 
   // Get user profile from onboarding
-  final profileAsync = ref.watch(userProfileProvider(userId));
-  final profile = await profileAsync.future;
+  final profile = await ref.watch(userProfileProvider.future);
 
   if (profile == null) {
     throw StateError('User profile not found. Complete onboarding first.');
