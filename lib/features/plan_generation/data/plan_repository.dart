@@ -1,4 +1,7 @@
 import 'package:fitgenie_app/features/onboarding/domain/user_profile.dart';
+import 'package:fitgenie_app/features/plan_generation/domain/day_plan.dart';
+import 'package:fitgenie_app/features/plan_generation/domain/exercise.dart';
+import 'package:fitgenie_app/features/plan_generation/domain/meal.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
 import 'package:fitgenie_app/features/plan_generation/data/gemini_service.dart';
 import 'package:fitgenie_app/features/plan_generation/data/prompt_builder.dart';
@@ -261,13 +264,13 @@ class PlanRepository {
       isComplete: isComplete,
     );
 
-    final updatedExercises = List<dynamic>.from(day.workout!.exercises);
+    final updatedExercises = List<Exercise>.from(day.workout!.exercises);
     updatedExercises[exerciseIndex] = updatedExercise;
 
     final updatedWorkout = day.workout!.copyWith(exercises: updatedExercises);
     final updatedDay = day.copyWith(workout: updatedWorkout);
 
-    final updatedDays = List<dynamic>.from(plan.days);
+    final updatedDays = List<DayPlan>.from(plan.days);
     updatedDays[dayIndex] = updatedDay;
 
     final updatedPlan = plan.copyWith(days: updatedDays);
@@ -320,12 +323,12 @@ class PlanRepository {
 
     final updatedMeal = day.meals[mealIndex].copyWith(isComplete: isComplete);
 
-    final updatedMeals = List<dynamic>.from(day.meals);
+    final updatedMeals = List<Meal>.from(day.meals);
     updatedMeals[mealIndex] = updatedMeal;
 
     final updatedDay = day.copyWith(meals: updatedMeals);
 
-    final updatedDays = List<dynamic>.from(plan.days);
+    final updatedDays = List<DayPlan>.from(plan.days);
     updatedDays[dayIndex] = updatedDay;
 
     final updatedPlan = plan.copyWith(days: updatedDays);
