@@ -328,8 +328,3 @@ DateTime _dateFromJson(String json) => DateTime.parse(json);
 ///
 /// Converts DateTime object to ISO 8601 string.
 String _dateToJson(DateTime date) => date.toIso8601String();
-
-/// Extension for nullable list access.
-extension _ListExtension<T> on List<T> {
-  T? get firstOrNull => isEmpty ? null : first;
-}
