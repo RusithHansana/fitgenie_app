@@ -243,6 +243,35 @@ class Formatters {
     return '$sets $setWord × $reps $repWord';
   }
 
+  /// Formats sets and reps where reps is a string (for ranges, durations, etc.).
+  ///
+  /// Handles:
+  /// - Fixed count: "10", "15", "20"
+  /// - Range: "8-10", "10-12", "12-15"
+  /// - Duration: "30 seconds", "1 minute", "45 seconds"
+  /// - To failure: "To failure", "AMRAP"
+  ///
+  /// Example:
+  /// ```dart
+  /// Formatters.exerciseSetsReps(3, '10-12');       // "3 × 10-12 reps"
+  /// Formatters.exerciseSetsReps(4, '15');          // "4 × 15 reps"
+  /// Formatters.exerciseSetsReps(3, '30 seconds');  // "3 × 30 seconds"
+  /// Formatters.exerciseSetsReps(4, 'To failure');  // "4 × To failure"
+  /// ```
+  static String exerciseSetsReps(int sets, String reps) {
+    // Check if reps contains time-based description
+    final hasTimeUnit =
+        reps.toLowerCase().contains('second') ||
+        reps.toLowerCase().contains('minute');
+
+    if (hasTimeUnit) {
+      return '$sets × $reps';
+    } else {
+      // Assume rep count
+      return '$sets × $reps reps';
+    }
+  }
+
   /// Formats sets and reps in compact form.
   ///
   /// Example:
@@ -252,6 +281,31 @@ class Formatters {
   /// ```
   static String setsRepsCompact(int sets, int reps) {
     return '$sets×$reps';
+  }
+
+  /// Formats rest time for exercises.
+  ///
+  /// Converts seconds to human-readable format with "rest" suffix.
+  ///
+  /// Example:
+  /// ```dart
+  /// Formatters.exerciseRest(30);    // "30 sec rest"
+  /// Formatters.exerciseRest(60);    // "1:00 rest"
+  /// Formatters.exerciseRest(90);    // "1:30 rest"
+  /// Formatters.exerciseRest(120);   // "2:00 rest"
+  /// ```
+  static String exerciseRest(int seconds) {
+    if (seconds < 60) {
+      return '$seconds sec rest';
+    } else {
+      final minutes = seconds ~/ 60;
+      final remainingSeconds = seconds % 60;
+      if (remainingSeconds == 0) {
+        return '$minutes:00 rest';
+      } else {
+        return '$minutes:${remainingSeconds.toString().padLeft(2, '0')} rest';
+      }
+    }
   }
 
   // ==========================================================================
