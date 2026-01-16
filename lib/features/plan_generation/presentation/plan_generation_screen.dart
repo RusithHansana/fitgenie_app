@@ -6,6 +6,7 @@ import 'package:fitgenie_app/features/plan_generation/plan_providers.dart';
 import 'package:fitgenie_app/features/plan_generation/presentation/widgets/generation_animation.dart';
 import 'package:fitgenie_app/shared/widgets/error_display.dart';
 import 'package:fitgenie_app/core/constants/app_sizes.dart';
+import 'package:fitgenie_app/core/constants/app_strings.dart';
 import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
 
 /// Screen that manages the plan generation flow.
@@ -258,20 +259,20 @@ class _PlanGenerationScreenState extends ConsumerState<PlanGenerationScreen> {
   String _getErrorDetails(AiErrorType errorType) {
     switch (errorType) {
       case AiErrorType.networkError:
-        return 'Check your internet connection and try again.';
+        return AppStrings.errorNoConnection;
       case AiErrorType.rateLimited:
-        return 'Our AI is busy. Please wait a moment and retry.';
+        return AppStrings.errorAiRateLimited;
       case AiErrorType.timeout:
-        return 'The request took too long. Please try again.';
+        return AppStrings.errorAiTimeout;
       case AiErrorType.invalidApiKey:
-        return 'There\'s a configuration issue. Please contact support.';
+        return AppStrings.errorAiInvalidApiKey;
       case AiErrorType.parseError:
       case AiErrorType.invalidResponse:
-        return 'We received an unexpected response. Retrying may help.';
+        return AppStrings.errorAiParseError;
       case AiErrorType.contentFiltered:
-        return 'Unable to generate with current settings. Try adjusting your profile.';
+        return AppStrings.errorAiContentFiltered;
       case AiErrorType.unknown:
-        return 'An unexpected error occurred. Please try again.';
+        return AppStrings.errorUnknown;
     }
   }
 }

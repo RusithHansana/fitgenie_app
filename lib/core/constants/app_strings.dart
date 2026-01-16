@@ -340,6 +340,12 @@ class AppStrings {
       'AI request timed out. Please try again.';
   static const String errorAiGeneration =
       'Couldn\'t generate plan. Please try again.';
+  static const String errorAiInvalidApiKey =
+      'There\'s a configuration issue. Please contact support.';
+  static const String errorAiParseError =
+      'We received an unexpected response. Retrying may help.';
+  static const String errorAiContentFiltered =
+      'Unable to generate with current settings. Try adjusting your profile.';
 
   // Sync errors
   static const String errorSyncFailed = 'Sync failed. Will retry when online.';
