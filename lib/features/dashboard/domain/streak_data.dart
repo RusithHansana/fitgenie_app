@@ -1,4 +1,5 @@
 import 'package:fitgenie_app/core/constants/app_strings.dart';
+import 'package:fitgenie_app/core/extensions/date_extensions.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'streak_data.freezed.dart';
@@ -151,11 +152,6 @@ class StreakData with _$StreakData {
     );
   }
 
-  /// Converts a DateTime to a date-only DateTime (midnight of that day).
-  static DateTime _toDateOnly(DateTime dateTime) {
-    return DateTime(dateTime.year, dateTime.month, dateTime.day);
-  }
-
   /// Whether the user has an active streak (currentStreak > 0).
   ///
   /// Returns true if the user has completed at least one day consecutively.
@@ -213,8 +209,8 @@ class StreakData with _$StreakData {
     if (streakStartDate == null) return 0;
 
     final now = DateTime.now();
-    final start = _toDateOnly(streakStartDate!);
-    final today = _toDateOnly(now);
+    final start = streakStartDate!.startOfDay;
+    final today = now.startOfDay;
 
     return today.difference(start).inDays + 1; // +1 to include start day
   }
@@ -231,8 +227,8 @@ class StreakData with _$StreakData {
     if (lastCompletedDate == null) return true;
 
     final now = DateTime.now();
-    final today = _toDateOnly(now);
-    final lastCompleted = _toDateOnly(lastCompletedDate!);
+    final today = now.startOfDay;
+    final lastCompleted = lastCompletedDate!.startOfDay;
 
     // If last completion was today or yesterday, no reset needed
     final daysDifference = today.difference(lastCompleted).inDays;
@@ -246,8 +242,8 @@ class StreakData with _$StreakData {
     if (lastCompletedDate == null) return false;
 
     final now = DateTime.now();
-    final today = _toDateOnly(now);
-    final lastCompleted = _toDateOnly(lastCompletedDate!);
+    final today = now.startOfDay;
+    final lastCompleted = lastCompletedDate!.startOfDay;
 
     return lastCompleted == today;
   }
@@ -262,8 +258,8 @@ class StreakData with _$StreakData {
     if (completedToday) return false;
 
     final now = DateTime.now();
-    final today = _toDateOnly(now);
-    final lastCompleted = _toDateOnly(lastCompletedDate!);
+    final today = now.startOfDay;
+    final lastCompleted = lastCompletedDate!.startOfDay;
 
     final daysDifference = today.difference(lastCompleted).inDays;
     return daysDifference == 1;
