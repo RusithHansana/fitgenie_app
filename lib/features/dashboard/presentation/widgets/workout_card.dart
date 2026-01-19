@@ -62,11 +62,15 @@ class WorkoutCard extends StatefulWidget {
   /// List of completed exercise IDs.
   final List<String> completedExerciseIds;
 
+  /// Callback when an exercise completion is toggled.
+  final void Function(String exerciseId) onExerciseToggle;
+
   /// Creates a [WorkoutCard] widget.
   const WorkoutCard({
     super.key,
     required this.workout,
     required this.completedExerciseIds,
+    required this.onExerciseToggle,
   });
 
   @override
@@ -228,9 +232,7 @@ class _WorkoutCardState extends State<WorkoutCard> {
                       return ExerciseTile(
                         exercise: exercise,
                         isComplete: isComplete,
-                        onToggle: () {
-                          // Toggle will be handled by parent via provider
-                        },
+                        onToggle: () => widget.onExerciseToggle(exercise.id),
                       );
                     }).toList(),
                   ),
