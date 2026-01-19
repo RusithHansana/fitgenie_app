@@ -222,6 +222,16 @@ class Meal with _$Meal {
     /// - "Layer ingredients in a bowl."
     String? instructions,
 
+    /// List of dietary restrictions this meal satisfies.
+    ///
+    /// Used to display dietary compliance badges in the UI.
+    /// Examples: ["Vegetarian", "Gluten-free", "Nut-free"]
+    ///
+    /// This field is populated by Gemini AI based on the meal's
+    /// ingredients and the user's dietary restrictions. It shows
+    /// which restrictions this specific meal complies with.
+    @Default([]) List<String> dietaryInfo,
+
     /// Whether the user has consumed this meal today.
     ///
     /// Defaults to false. Set to true when user checks off the meal.

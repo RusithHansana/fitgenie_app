@@ -85,6 +85,8 @@ $contextString
    - Every meal must comply with ALL dietary restrictions
    - Double-check ingredients for hidden allergens
    - No substitutions that violate restrictions
+   - For each meal, include a "dietaryInfo" array listing which restrictions it satisfies
+   - Example: If user is vegetarian and nut-free, a tofu meal should have ["Vegetarian", "Nut-free"]
 
 3. SAFETY:
    - Exercises appropriate for the user's experience level
@@ -116,6 +118,7 @@ $contextString
 - Include variety in food choices
 - Simple, practical meals that don't require excessive prep time
 - All ingredients must respect dietary restrictions
+- For each meal, populate "dietaryInfo" with applicable restriction labels
 
 === REQUIRED OUTPUT FORMAT ===
 You MUST respond with ONLY valid JSON matching this EXACT schema. No markdown, no explanations, just the JSON object:
@@ -156,6 +159,7 @@ You MUST respond with ONLY valid JSON matching this EXACT schema. No markdown, n
           "fat": 15,
           "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
           "instructions": "Brief preparation steps",
+          "dietaryInfo": ["Vegetarian", "Gluten-free"],
           "isComplete": false
         }
       ]
@@ -356,6 +360,7 @@ Respond in 2-3 sentences maximum.
       'carbs',
       'fat',
       'ingredients',
+      'dietaryInfo',
     ],
   };
 }

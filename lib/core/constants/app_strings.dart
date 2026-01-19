@@ -305,8 +305,32 @@ class AppStrings {
   static const String buttonSignOut = 'Sign Out';
 
   // ============================================================================
-  // ERROR MESSAGES
+  // STREAK
   // ============================================================================
+
+  // Display text
+  static const String streakNoStreakYet = 'No streak yet';
+  static const String streakOneDayStreak = '1 day streak';
+  static const String streakOneDay = '1 day';
+
+  // Emojis
+  static const String emojiStreakActive = '🔥';
+  static const String emojiMilestone = '⭐';
+  static const String emojiPersonalBest = '🏆';
+  static const String emojiNoStreak = '💪';
+
+  // Motivational messages
+  static const String motivationalMilestoneAchieved =
+      'Amazing! {days} days in a row!';
+  static const String motivationalPersonalBest = 'New personal record!';
+  static const String motivationalKeepMomentum = 'Keep the momentum going!';
+  static const String motivationalGreatStart = 'Great start! Keep it up!';
+  static const String motivationalStartStreak =
+      'Complete your tasks to start a streak!';
+
+  // ============================================================================
+  // ERROR MESSAGES
+  // ==========================================================================
 
   // Authentication errors (user-friendly versions)
   static const String errorInvalidEmail = 'Please enter a valid email address';
