@@ -251,11 +251,23 @@ class AppStrings {
   // CHAT & MODIFICATIONS
   // ============================================================================
 
+  // Screen
+  static const String chatScreenTitle = 'Chat with FitGenie';
   static const String chatTitle = 'Modify Your Plan';
   static const String chatDescription =
       'Ask me to adjust your workouts or meals. I\'ll update your plan instantly!';
+  static const String chatEmptyStateDescription =
+      'Ask me to modify your plan!\n'
+      'I can help you swap meals, adjust workouts,\n'
+      'or make any changes you need.';
   static const String chatPlaceholder = 'Type your request...';
   static const String buttonSend = 'Send';
+  static const String chatClearHistoryTooltip = 'Clear chat history';
+
+  // Empty state examples
+  static const String chatExampleEasier = 'Make Tuesday easier';
+  static const String chatExampleSwapMeal = 'Swap this meal';
+  static const String chatExampleSkipWorkout = 'Skip workout';
 
   // Quick modification chips
   static const String chipSkipWorkout = 'Skip today\'s workout';
@@ -299,6 +311,13 @@ class AppStrings {
       'Message too long. Maximum {max} characters.';
   static const String errorSaveMessageFailed =
       "Couldn't save your message. Please check your connection.";
+  static const String errorClearHistoryFailed = 'Failed to clear history';
+
+  // Chat history management
+  static const String chatClearHistoryTitle = 'Clear chat history?';
+  static const String chatClearHistoryMessage =
+      'This will delete all your messages. This action cannot be undone.';
+  static const String chatHistoryClearedMessage = 'Deleted {count} messages';
 
   // ============================================================================
   // PROFILE
@@ -467,6 +486,7 @@ class AppStrings {
   static const String buttonRetry = 'Retry';
   static const String buttonClose = 'Close';
   static const String buttonUndo = 'Undo';
+  static const String buttonClear = 'Clear';
 
   static const String labelLoading = 'Loading...';
   static const String labelOffline = 'Offline';
