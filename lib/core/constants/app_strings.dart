@@ -270,6 +270,36 @@ class AppStrings {
   static const String chatStatusUpdating = 'Updating your plan...';
   static const String chatStatusComplete = 'Plan updated!';
 
+  // Chat responses
+  static const String chatModificationConfirmation =
+      "I've updated your plan based on your request. "
+      "The changes have been applied and you can see them in your plan view.";
+  static const String chatHelpResponse =
+      "I can help you modify your plan! Try asking me to:\n"
+      "• Swap a meal or exercise\n"
+      "• Make a workout easier or harder\n"
+      "• Change dietary preferences\n"
+      "• Skip a day";
+  static const String chatPlanHelpResponse =
+      "I'm here to help with your fitness plan! "
+      "You can ask me to make changes to your workouts or meals.";
+  static const String chatAssistantIntro =
+      "I'm your fitness assistant! "
+      "Ask me to modify your plan whenever you need.";
+
+  // Chat context (internal)
+  static const String chatContextActivePlan =
+      'User has an active plan for the week.';
+  static const String chatContextNoPlan = 'User has no active plan yet.';
+
+  // Chat errors
+  static const String errorLoadMessage = 'Error loading message';
+  static const String errorMessageEmpty = 'Message content cannot be empty';
+  static const String errorMessageTooLong =
+      'Message too long. Maximum {max} characters.';
+  static const String errorSaveMessageFailed =
+      "Couldn't save your message. Please check your connection.";
+
   // ============================================================================
   // PROFILE
   // ============================================================================
