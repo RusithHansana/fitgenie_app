@@ -1,137 +1,110 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:fitgenie_app/core/config/environment.dart';
+import 'package:fitgenie_app/core/theme/app_theme.dart';
 import 'package:fitgenie_app/firebase_options.dart';
+import 'package:fitgenie_app/routing/app_router.dart';
 import 'package:fitgenie_app/shared/services/hive_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// Application entry point handling initialization and app widget setup.
+///
+/// Initialization sequence (order is critical):
+/// 1. WidgetsFlutterBinding - Initialize Flutter framework
+/// 2. Environment configuration - Load .env file for API keys
+/// 3. Firebase - Initialize with platform-specific options
+/// 4. Firebase App Check - Security layer for API calls
+/// 5. Hive - Local storage initialization
+/// 6. System UI - Configure status bar and navigation bar
+/// 7. runApp - Start the Flutter application wrapped in ProviderScope
+///
+/// The ProviderScope wraps the entire app to enable Riverpod state management
+/// throughout the widget tree.
 void main() async {
+  // Ensure Flutter framework is initialized before any async operations
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Load environment configuration
+  // Uses .env.development for debug builds, .env.production for release
+  try {
+    await EnvironmentConfig.loadFromBuildMode();
+  } catch (e) {
+    // Log error but continue - app can function without environment variables
+    // in development mode. Production builds should fail if env is missing.
+    debugPrint('Failed to load environment configuration: $e');
+  }
+
+  // Initialize Firebase with platform-specific configuration
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // Activate Firebase App Check for security
+  // Uses debug providers in development, production tokens in release
   await FirebaseAppCheck.instance.activate(
     androidProvider: AndroidProvider.debug,
     appleProvider: AppleProvider.debug,
   );
 
+  // Initialize Hive for local storage
+  // Opens all required boxes for offline-first functionality
   await HiveService.initialize();
 
-  runApp(const MyApp());
+  // Configure system UI overlay style
+  // Makes status bar transparent with dark icons for light theme
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ),
+  );
+
+  // Set preferred orientations (portrait only for MVP)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Run app wrapped in ProviderScope for Riverpod
+  runApp(const ProviderScope(child: FitGenieApp()));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+/// Root application widget for FitGenie.
+///
+/// This ConsumerWidget sets up the MaterialApp.router with:
+/// - Go router configuration from [appRouterProvider]
+/// - Light and dark themes from [AppTheme]
+/// - System theme mode for automatic switching
+/// - App title and basic Material 3 configuration
+///
+/// The router handles all navigation including authentication guards,
+/// onboarding flow, and main app screens. It automatically redirects
+/// based on auth state and onboarding completion status.
+class FitGenieApp extends ConsumerWidget {
+  const FitGenieApp({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the router provider to get GoRouter instance
+    final router = ref.watch(appRouterProvider);
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+    return MaterialApp.router(
+      // App identification
+      title: 'FitGenie',
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+      // Routing configuration
+      routerConfig: router,
 
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      // Theme configuration
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system, // Follows system preference
+      // Remove debug banner in release mode
+      debugShowCheckedModeBanner: false,
+
+      // Material 3 design language
+      // Already enabled in AppTheme, but explicit here for clarity
     );
   }
 }
