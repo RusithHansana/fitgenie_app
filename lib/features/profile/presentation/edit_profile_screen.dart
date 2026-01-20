@@ -2,6 +2,7 @@ import 'package:fitgenie_app/core/constants/app_sizes.dart';
 import 'package:fitgenie_app/core/constants/app_strings.dart';
 import 'package:fitgenie_app/core/constants/dietary_options.dart';
 import 'package:fitgenie_app/core/extensions/context_extensions.dart';
+import 'package:fitgenie_app/core/utils/validators.dart';
 import 'package:fitgenie_app/features/onboarding/domain/user_profile.dart';
 import 'package:fitgenie_app/features/profile/profile_providers.dart';
 import 'package:fitgenie_app/shared/widgets/app_button.dart';
@@ -302,16 +303,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           label: AppStrings.labelAge,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return AppStrings.errorRequiredField;
-            }
-            final age = int.tryParse(value);
-            if (age == null || age < 13 || age > 120) {
-              return AppStrings.errorInvalidAge;
-            }
-            return null;
-          },
+          validator: Validators.age,
         ),
 
         const SizedBox(height: AppSizes.spacingMd),
@@ -331,16 +323,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
                 ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return AppStrings.errorRequiredField;
-                  }
-                  final weight = double.tryParse(value);
-                  if (weight == null || weight < 30 || weight > 500) {
-                    return AppStrings.errorInvalidWeight;
-                  }
-                  return null;
-                },
+                validator: Validators.weight,
               ),
             ),
             const SizedBox(width: AppSizes.spacingMd),
@@ -383,16 +366,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
                 ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return AppStrings.errorRequiredField;
-                  }
-                  final height = double.tryParse(value);
-                  if (height == null || height < 100 || height > 250) {
-                    return AppStrings.errorInvalidHeight;
-                  }
-                  return null;
-                },
+                validator: Validators.height,
               ),
             ),
             const SizedBox(width: AppSizes.spacingMd),
