@@ -1,6 +1,7 @@
 import 'package:fitgenie_app/core/constants/app_sizes.dart';
 import 'package:fitgenie_app/core/constants/app_strings.dart';
 import 'package:fitgenie_app/core/extensions/context_extensions.dart';
+import 'package:fitgenie_app/routing/app_router.dart';
 import 'package:fitgenie_app/shared/widgets/skeleton_loader.dart';
 import 'package:fitgenie_app/features/profile/presentation/widgets/profile_header.dart';
 import 'package:fitgenie_app/features/profile/presentation/widgets/stats_card.dart';
@@ -285,13 +286,7 @@ class ProfileScreen extends ConsumerWidget {
           FilledButton(
             onPressed: () {
               Navigator.of(context).pop();
-              // TODO: Navigate to plan generation screen
-              // This will be implemented when plan_generation feature is available
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Plan regeneration will be available soon'),
-                ),
-              );
+              context.goToPlanGeneration();
             },
             child: const Text('Regenerate'),
           ),
