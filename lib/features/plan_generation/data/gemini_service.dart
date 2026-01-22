@@ -1,4 +1,5 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:logger/logger.dart';
 import 'package:fitgenie_app/core/config/app_config.dart';
 import 'package:fitgenie_app/core/constants/ai_constants.dart';
 import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
@@ -46,11 +47,17 @@ import 'package:fitgenie_app/core/utils/retry_helper.dart';
 /// - Max 3 retries with exponential backoff
 /// - API key loaded from AppConfig
 class GeminiService {
+  /// Logger instance for tracking operations and errors.
+  final Logger logger;
+
   /// Creates a GeminiService instance.
   ///
   /// Initializes the Gemini model with API key from app configuration.
   /// The model is lazily created on first use.
-  GeminiService() {
+  ///
+  /// Parameters:
+  /// - [logger]: Logger instance for tracking operations
+  GeminiService({required this.logger}) {
     _initializeModel();
   }
 
@@ -138,7 +145,7 @@ class GeminiService {
       () => _executeGeneration(prompt),
       onRetry: (attempt, delay, error) {
         // Log retry attempts for debugging
-        print(
+        logger.w(
           'Gemini generation retry $attempt after ${delay}s: ${error.toString()}',
         );
       },
@@ -167,7 +174,7 @@ class GeminiService {
     return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
       () => _executeGeneration(prompt),
       onRetry: (attempt, delay, error) {
-        print(
+        logger.w(
           'Gemini modification retry $attempt after ${delay}s: ${error.toString()}',
         );
       },

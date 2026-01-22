@@ -1,3 +1,4 @@
+import 'package:logger/logger.dart';
 import 'package:fitgenie_app/shared/services/hive_service.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
 
@@ -45,10 +46,16 @@ import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
 /// - No network dependency
 /// - Returns null for missing data (no exceptions)
 class PlanLocalDatasource {
+  /// Logger instance for tracking operations and errors.
+  final Logger logger;
+
   /// Creates a PlanLocalDatasource instance.
   ///
   /// Accesses the Hive box through HiveService static getter.
-  const PlanLocalDatasource();
+  ///
+  /// Parameters:
+  /// - [logger]: Logger instance for tracking operations
+  const PlanLocalDatasource({required this.logger});
 
   /// Generates the Hive storage key for a user's plan.
   ///
@@ -86,7 +93,7 @@ class PlanLocalDatasource {
     } catch (e) {
       // Log error but don't throw - local storage failures shouldn't
       // break the app since we have remote fallback
-      print('Error saving plan to local storage: $e');
+      logger.e('Error saving plan to local storage', error: e);
     }
   }
 
@@ -128,7 +135,7 @@ class PlanLocalDatasource {
       return WeeklyPlan.fromJson(planJson);
     } catch (e) {
       // Log error and return null - don't throw
-      print('Error reading plan from local storage: $e');
+      logger.e('Error reading plan from local storage', error: e);
       return null;
     }
   }
@@ -154,7 +161,7 @@ class PlanLocalDatasource {
       final key = _getPlanKey(userId);
       return box.containsKey(key);
     } catch (e) {
-      print('Error checking plan cache: $e');
+      logger.e('Error checking plan cache', error: e);
       return false;
     }
   }
@@ -181,7 +188,7 @@ class PlanLocalDatasource {
       final key = _getPlanKey(userId);
       await box.delete(key);
     } catch (e) {
-      print('Error deleting plan from local storage: $e');
+      logger.e('Error deleting plan from local storage', error: e);
     }
   }
 
@@ -214,7 +221,7 @@ class PlanLocalDatasource {
         await box.delete(key);
       }
     } catch (e) {
-      print('Error clearing all plans from local storage: $e');
+      logger.e('Error clearing all plans from local storage', error: e);
     }
   }
 
@@ -248,7 +255,7 @@ class PlanLocalDatasource {
       final age = now.difference(plan.createdAt).inDays;
       return age;
     } catch (e) {
-      print('Error getting cached plan age: $e');
+      logger.e('Error getting cached plan age', error: e);
       return null;
     }
   }
@@ -291,7 +298,7 @@ class PlanLocalDatasource {
         'startDate': planJson['startDate'],
       };
     } catch (e) {
-      print('Error getting plan metadata: $e');
+      logger.e('Error getting plan metadata', error: e);
       return null;
     }
   }

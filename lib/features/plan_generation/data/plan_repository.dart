@@ -1,3 +1,4 @@
+import 'package:logger/logger.dart';
 import 'package:fitgenie_app/features/onboarding/domain/user_profile.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/day_plan.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/exercise.dart';
@@ -57,16 +58,21 @@ import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
 /// - Exceptions are typed (AiException, FirebaseException)
 /// - Repository doesn't expose datasources directly
 class PlanRepository {
+  /// Logger instance for tracking operations and errors.
+  final Logger logger;
+
   /// Creates a PlanRepository with required dependencies.
   ///
   /// Parameters:
   /// - [geminiService]: Service for AI plan generation
   /// - [localDatasource]: Hive-based local storage
   /// - [remoteDatasource]: Firestore-based remote storage
+  /// - [logger]: Logger instance for tracking operations
   const PlanRepository({
     required GeminiService geminiService,
     required PlanLocalDatasource localDatasource,
     required PlanRemoteDatasource remoteDatasource,
+    required this.logger,
   }) : _geminiService = geminiService,
        _localDatasource = localDatasource,
        _remoteDatasource = remoteDatasource;
@@ -150,7 +156,7 @@ class PlanRepository {
     try {
       await _remoteDatasource.savePlan(plan.userId, plan);
     } catch (e) {
-      print('Warning: Failed to sync plan to Firestore: $e');
+      logger.w('Failed to sync plan to Firestore', error: e);
       // Continue - local cache is sufficient for now
     }
 
@@ -199,7 +205,7 @@ class PlanRepository {
 
       return plan;
     } catch (e) {
-      print('Error fetching plan from Firestore: $e');
+      logger.e('Error fetching plan from Firestore', error: e);
       // Return null - might be offline
       return null;
     }
@@ -216,7 +222,7 @@ class PlanRepository {
     try {
       return await _remoteDatasource.getPlanById(userId, planId);
     } catch (e) {
-      print('Error fetching plan by ID: $e');
+      logger.e('Error fetching plan by ID', error: e);
       return null;
     }
   }
@@ -286,7 +292,7 @@ class PlanRepository {
         fieldPath: isComplete,
       });
     } catch (e) {
-      print('Warning: Failed to sync exercise completion: $e');
+      logger.w('Failed to sync exercise completion', error: e);
     }
 
     return updatedPlan;
@@ -343,7 +349,7 @@ class PlanRepository {
         fieldPath: isComplete,
       });
     } catch (e) {
-      print('Warning: Failed to sync meal completion: $e');
+      logger.w('Failed to sync meal completion', error: e);
     }
 
     return updatedPlan;
@@ -410,7 +416,7 @@ class PlanRepository {
     try {
       await _remoteDatasource.savePlan(userId, modifiedPlan);
     } catch (e) {
-      print('Warning: Failed to sync modified plan: $e');
+      logger.w('Failed to sync modified plan', error: e);
     }
 
     return modifiedPlan;
@@ -437,7 +443,7 @@ class PlanRepository {
       await _remoteDatasource.savePlan(userId, plan);
       return true;
     } catch (e) {
-      print('Sync failed: $e');
+      logger.e('Sync failed', error: e);
       return false;
     }
   }
@@ -457,7 +463,7 @@ class PlanRepository {
     try {
       await _remoteDatasource.deletePlan(userId, planId);
     } catch (e) {
-      print('Warning: Failed to delete plan from Firestore: $e');
+      logger.w('Failed to delete plan from Firestore', error: e);
     }
   }
 
