@@ -5,6 +5,7 @@ import 'package:fitgenie_app/core/extensions/context_extensions.dart';
 import 'package:fitgenie_app/core/utils/validators.dart';
 import 'package:fitgenie_app/features/onboarding/domain/user_profile.dart';
 import 'package:fitgenie_app/features/profile/profile_providers.dart';
+import 'package:fitgenie_app/routing/app_router.dart';
 import 'package:fitgenie_app/shared/widgets/app_button.dart';
 import 'package:fitgenie_app/shared/widgets/app_text_field.dart';
 import 'package:flutter/material.dart';
@@ -210,12 +211,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
 
     if (result == true && mounted) {
-      // TODO: Navigate to plan generation when implemented
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Plan regeneration will be available soon'),
-        ),
-      );
+      context.goToPlanGeneration();
     }
   }
 
