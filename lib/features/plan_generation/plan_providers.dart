@@ -52,6 +52,7 @@ PlanRepository planRepository(PlanRepositoryRef ref) {
     geminiService: ref.watch(geminiServiceProvider),
     localDatasource: ref.watch(planLocalDatasourceProvider),
     remoteDatasource: ref.watch(planRemoteDatasourceProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 
