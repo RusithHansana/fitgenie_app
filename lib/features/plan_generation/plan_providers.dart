@@ -27,7 +27,7 @@ GeminiService geminiService(GeminiServiceRef ref) {
 /// Creates and caches the local datasource for Hive operations.
 @Riverpod(keepAlive: true)
 PlanLocalDatasource planLocalDatasource(PlanLocalDatasourceRef ref) {
-  return const PlanLocalDatasource();
+  return PlanLocalDatasource(logger: ref.watch(loggerProvider));
 }
 
 /// Provider for PlanRemoteDatasource singleton.
