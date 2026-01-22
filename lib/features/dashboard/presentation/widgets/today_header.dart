@@ -4,6 +4,7 @@ import 'package:fitgenie_app/core/extensions/date_extensions.dart';
 import 'package:fitgenie_app/core/extensions/string_extensions.dart';
 import 'package:fitgenie_app/features/dashboard/dashboard_providers.dart';
 import 'package:fitgenie_app/features/auth/auth_providers.dart';
+import 'package:fitgenie_app/routing/app_router.dart';
 import 'package:fitgenie_app/features/dashboard/presentation/widgets/streak_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,8 +102,7 @@ class TodayHeader extends ConsumerWidget {
                     color: context.colorScheme.onSurfaceVariant,
                   ),
                   onPressed: () {
-                    // TODO: Navigate to settings/profile
-                    // This will be implemented when routing is set up
+                    context.goToProfile();
                   },
                   tooltip: 'Settings',
                 ),
