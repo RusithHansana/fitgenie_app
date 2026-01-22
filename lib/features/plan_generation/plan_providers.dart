@@ -9,6 +9,7 @@ import 'package:fitgenie_app/features/auth/auth_providers.dart';
 import 'package:fitgenie_app/features/onboarding/onboarding_providers.dart';
 import 'package:fitgenie_app/shared/providers/firebase_providers.dart'
     hide currentUserIdProvider;
+import 'package:fitgenie_app/shared/providers/logger_provider.dart';
 
 part 'plan_providers.g.dart';
 
@@ -18,7 +19,7 @@ part 'plan_providers.g.dart';
 /// The service is initialized once and reused across the app.
 @Riverpod(keepAlive: true)
 GeminiService geminiService(GeminiServiceRef ref) {
-  return GeminiService();
+  return GeminiService(logger: ref.watch(loggerProvider));
 }
 
 /// Provider for PlanLocalDatasource singleton.
