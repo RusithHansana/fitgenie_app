@@ -48,7 +48,6 @@ class AppConfig {
   /// Application version.
   ///
   /// Should match pubspec.yaml version.
-  /// TODO: Consider reading from package_info_plus for accuracy.
   static const String appVersion = '1.0.0';
 
   /// Application build number.
@@ -267,22 +266,6 @@ class AppConfig {
     if (value == null || value.isEmpty) return defaultValue;
 
     return int.tryParse(value) ?? defaultValue;
-  }
-
-  /// Safely gets a double environment variable with a default value.
-  ///
-  /// Returns default if the value is not a valid double.
-  static double _getDoubleEnv(String key, {required double defaultValue}) {
-    final value = dotenv.env[key];
-    if (value == null || value.isEmpty) return defaultValue;
-
-    return double.tryParse(value) ?? defaultValue;
-  }
-
-  /// Safely gets a string environment variable with a default value.
-  static String _getStringEnv(String key, {required String defaultValue}) {
-    final value = dotenv.env[key];
-    return (value == null || value.isEmpty) ? defaultValue : value;
   }
 
   // ==========================================================================
