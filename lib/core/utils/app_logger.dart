@@ -100,7 +100,7 @@ class AppLogger {
         lineLength: 120, // Width of output
         colors: true, // Colorful output
         printEmojis: true, // Use emojis for log level
-        printTime: true, // Include timestamp
+        dateTimeFormat: DateTimeFormat.dateAndTime, // Include timestamp
         excludeBox: {Level.debug: false, Level.trace: false},
       );
     }
