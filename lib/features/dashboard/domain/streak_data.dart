@@ -301,10 +301,18 @@ class StreakData with _$StreakData {
   /// - 🏆 for personal bests
   /// - 💪 for getting started (no streak yet)
   String get emoji {
-    if (isMilestone) return AppStrings.emojiMilestone;
-    if (isPersonalBest && currentStreak > 1)
+    if (isMilestone) {
+      return AppStrings.emojiMilestone;
+    }
+
+    if (isPersonalBest && currentStreak > 1) {
       return AppStrings.emojiPersonalBest;
-    if (hasActiveStreak) return AppStrings.emojiStreakActive;
+    }
+
+    if (hasActiveStreak) {
+      return AppStrings.emojiStreakActive;
+    }
+
     return AppStrings.emojiNoStreak;
   }
 

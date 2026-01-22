@@ -8,6 +8,7 @@ import 'package:fitgenie_app/features/dashboard/presentation/widgets/meal_card.d
 import 'package:fitgenie_app/features/dashboard/presentation/widgets/today_header.dart';
 import 'package:fitgenie_app/features/dashboard/presentation/widgets/workout_card.dart';
 import 'package:fitgenie_app/features/plan_generation/plan_providers.dart';
+import 'package:fitgenie_app/routing/app_router.dart';
 import 'package:fitgenie_app/shared/widgets/error_display.dart';
 import 'package:fitgenie_app/shared/widgets/offline_banner.dart';
 import 'package:fitgenie_app/shared/widgets/skeleton_loader.dart';
@@ -431,19 +432,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   /// Navigates to chat screen.
   void _navigateToChat() {
-    // TODO: Implement navigation to chat screen
-    // This will be implemented when routing is fully set up
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Chat feature coming soon!')));
+    context.goToChat();
   }
 
   /// Navigates to onboarding/plan generation.
   void _navigateToOnboarding() {
-    // TODO: Implement navigation to onboarding
-    // This will be implemented when routing is fully set up
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Plan generation coming soon!')),
-    );
+    context.goToPlanGeneration();
   }
 }

@@ -9,6 +9,7 @@ import 'package:fitgenie_app/features/auth/auth_providers.dart';
 import 'package:fitgenie_app/features/onboarding/onboarding_providers.dart';
 import 'package:fitgenie_app/shared/providers/firebase_providers.dart'
     hide currentUserIdProvider;
+import 'package:fitgenie_app/shared/providers/logger_provider.dart';
 
 part 'plan_providers.g.dart';
 
@@ -18,7 +19,7 @@ part 'plan_providers.g.dart';
 /// The service is initialized once and reused across the app.
 @Riverpod(keepAlive: true)
 GeminiService geminiService(GeminiServiceRef ref) {
-  return GeminiService();
+  return GeminiService(logger: ref.watch(loggerProvider));
 }
 
 /// Provider for PlanLocalDatasource singleton.
@@ -26,7 +27,7 @@ GeminiService geminiService(GeminiServiceRef ref) {
 /// Creates and caches the local datasource for Hive operations.
 @Riverpod(keepAlive: true)
 PlanLocalDatasource planLocalDatasource(PlanLocalDatasourceRef ref) {
-  return const PlanLocalDatasource();
+  return PlanLocalDatasource(logger: ref.watch(loggerProvider));
 }
 
 /// Provider for PlanRemoteDatasource singleton.
@@ -51,6 +52,7 @@ PlanRepository planRepository(PlanRepositoryRef ref) {
     geminiService: ref.watch(geminiServiceProvider),
     localDatasource: ref.watch(planLocalDatasourceProvider),
     remoteDatasource: ref.watch(planRemoteDatasourceProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 

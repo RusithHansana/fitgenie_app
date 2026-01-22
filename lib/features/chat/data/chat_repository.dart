@@ -3,6 +3,7 @@ import 'package:fitgenie_app/core/constants/app_strings.dart';
 import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
 import 'package:fitgenie_app/core/utils/retry_helper.dart';
 import 'package:fitgenie_app/features/chat/domain/chat_message.dart';
+import 'package:logger/logger.dart';
 import 'package:fitgenie_app/features/chat/domain/modification_request.dart';
 import 'package:fitgenie_app/features/plan_generation/data/gemini_service.dart';
 import 'package:fitgenie_app/features/plan_generation/data/prompt_builder.dart';
@@ -79,6 +80,9 @@ class ChatRepository {
   /// Gemini AI service for processing modifications.
   final GeminiService geminiService;
 
+  /// Logger instance for tracking operations and errors.
+  final Logger logger;
+
   /// UUID generator for message IDs.
   final Uuid _uuid = const Uuid();
 
@@ -87,7 +91,12 @@ class ChatRepository {
   /// Parameters:
   /// - [firestore]: FirebaseFirestore instance for persistence
   /// - [geminiService]: GeminiService for AI calls
-  ChatRepository({required this.firestore, required this.geminiService});
+  /// - [logger]: Logger instance for tracking operations
+  ChatRepository({
+    required this.firestore,
+    required this.geminiService,
+    required this.logger,
+  });
 
   /// Maximum message content length (characters).
   static const int maxMessageLength = 5000;
@@ -283,7 +292,7 @@ class ChatRepository {
         await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
           () => geminiService.modifyPlan(prompt),
           onRetry: (attempt, delay, error) {
-            print(
+            logger.w(
               'Retry modification attempt $attempt after ${delay}s: ${error.toString()}',
             );
           },
@@ -325,7 +334,7 @@ class ChatRepository {
 
       return true;
     } catch (e) {
-      print('Error applying modification: $e');
+      logger.e('Error applying modification', error: e);
       return false;
     }
   }
@@ -436,7 +445,7 @@ class ChatRepository {
         await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
           () => geminiService.modifyPlan(prompt),
           onRetry: (attempt, delay, error) {
-            print(
+            logger.w(
               'Modification retry $attempt after ${delay}s: ${error.toString()}',
             );
           },

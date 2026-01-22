@@ -5,6 +5,7 @@ import 'package:fitgenie_app/features/auth/auth_providers.dart';
 import 'package:fitgenie_app/features/plan_generation/plan_providers.dart';
 import 'package:fitgenie_app/shared/providers/firebase_providers.dart'
     hide currentUserIdProvider;
+import 'package:fitgenie_app/shared/providers/logger_provider.dart';
 
 part 'chat_providers.g.dart';
 
@@ -27,6 +28,7 @@ ChatRepository chatRepository(ChatRepositoryRef ref) {
   return ChatRepository(
     firestore: ref.watch(firestoreProvider),
     geminiService: ref.watch(geminiServiceProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 

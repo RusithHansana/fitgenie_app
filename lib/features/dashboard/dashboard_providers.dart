@@ -9,6 +9,7 @@ import 'package:fitgenie_app/features/auth/auth_providers.dart';
 import 'package:fitgenie_app/features/plan_generation/plan_providers.dart';
 import 'package:fitgenie_app/shared/providers/firebase_providers.dart'
     hide currentUserIdProvider;
+import 'package:fitgenie_app/shared/providers/logger_provider.dart';
 import 'package:fitgenie_app/shared/services/sync_queue.dart';
 
 part 'dashboard_providers.g.dart';
@@ -394,8 +395,8 @@ Future<void> _checkAndUpdateStreak(Ref ref, DailyCompletion completion) async {
     }
   } catch (e) {
     // Log error but don't throw - streak update shouldn't block completion
-    // TODO: Add proper error logging
-    print('Error updating streak: $e');
+    final logger = ref.read(loggerProvider);
+    logger.e('Error updating streak', error: e);
   }
 }
 
