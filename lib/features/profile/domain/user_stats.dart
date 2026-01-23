@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'user_stats.freezed.dart';
+part 'user_stats.g.dart';
 
 /// Aggregated user statistics for profile display.
 ///
@@ -76,6 +77,26 @@ class UserStats with _$UserStats {
     /// Used to calculate membership duration for display.
     required DateTime memberSince,
   }) = _UserStats;
+
+  /// Creates a UserStats from a JSON map.
+  ///
+  /// Used for deserializing from:
+  /// - Firestore documents
+  /// - Local cache
+  ///
+  /// Example:
+  /// ```dart
+  /// final stats = UserStats.fromJson({
+  ///   'currentStreak': 12,
+  ///   'longestStreak': 15,
+  ///   'totalWorkouts': 45,
+  ///   'totalMeals': 135,
+  ///   'plansGenerated': 3,
+  ///   'memberSince': '2025-06-01T00:00:00.000Z',
+  /// });
+  /// ```
+  factory UserStats.fromJson(Map<String, dynamic> json) =>
+      _$UserStatsFromJson(json);
 
   /// Creates an empty stats instance for new users.
   ///

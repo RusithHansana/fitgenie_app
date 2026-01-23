@@ -3,6 +3,7 @@ import 'package:fitgenie_app/core/extensions/date_extensions.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'streak_data.freezed.dart';
+part 'streak_data.g.dart';
 
 /// Represents user streak information for habit tracking and gamification.
 ///
@@ -134,6 +135,24 @@ class StreakData with _$StreakData {
     /// - Analytics and user engagement metrics
     DateTime? streakStartDate,
   }) = _StreakData;
+
+  /// Creates a StreakData from a JSON map.
+  ///
+  /// Used for deserializing from:
+  /// - Firestore documents
+  /// - Local cache
+  ///
+  /// Example:
+  /// ```dart
+  /// final streak = StreakData.fromJson({
+  ///   'currentStreak': 12,
+  ///   'longestStreak': 15,
+  ///   'lastCompletedDate': '2026-01-16T00:00:00.000Z',
+  ///   'streakStartDate': '2026-01-05T00:00:00.000Z',
+  /// });
+  /// ```
+  factory StreakData.fromJson(Map<String, dynamic> json) =>
+      _$StreakDataFromJson(json);
 
   /// Creates an empty StreakData for a new user.
   ///
