@@ -14,9 +14,9 @@ dependencies:
   riverpod_annotation: ^2.3.3
 
   # Firebase
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.14.0
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.20.0
+  cloud_firestore: ^4.17.5
 
   # Local Storage
   hive_flutter: ^1.1.0
@@ -65,6 +65,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - .env.development
 
 flutter_launcher_icons:
   android: true
