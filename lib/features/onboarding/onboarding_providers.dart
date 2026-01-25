@@ -135,6 +135,9 @@ class OnboardingStateNotifier extends AutoDisposeNotifier<OnboardingState> {
 /// This provider manages the state of the multi-step onboarding wizard,
 /// including current step position and all collected data.
 ///
+/// Uses `keepAlive: true` to prevent auto-disposal during page transitions,
+/// ensuring collected data persists throughout the onboarding flow.
+///
 /// Usage:
 /// ```dart
 /// // Watch the state
@@ -144,7 +147,7 @@ class OnboardingStateNotifier extends AutoDisposeNotifier<OnboardingState> {
 /// ref.read(onboardingStateProvider.notifier).nextStep();
 /// ref.read(onboardingStateProvider.notifier).updateData('age', 25);
 /// ```
-@riverpod
+@Riverpod(keepAlive: true)
 class OnboardingStateProvider extends _$OnboardingStateProvider {
   @override
   OnboardingState build() {
