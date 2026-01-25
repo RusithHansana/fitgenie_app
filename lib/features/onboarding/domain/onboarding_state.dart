@@ -166,7 +166,7 @@ class OnboardingState with _$OnboardingState {
   /// Returns the same state if already at the last step.
   OnboardingState nextStep() {
     if (isLastStep) return this;
-    return copyWith(currentStep: currentStep + 1);
+    return copyWith(currentStep: currentStep + 1, collectedData: collectedData);
   }
 
   /// Goes back to the previous step in the wizard.
@@ -174,7 +174,7 @@ class OnboardingState with _$OnboardingState {
   /// Returns the same state if already at the first step.
   OnboardingState previousStep() {
     if (isFirstStep) return this;
-    return copyWith(currentStep: currentStep - 1);
+    return copyWith(currentStep: currentStep - 1, collectedData: collectedData);
   }
 
   /// Jumps to a specific step in the wizard.
@@ -188,7 +188,7 @@ class OnboardingState with _$OnboardingState {
         'Step index $step is out of range [0, ${totalSteps - 1}]',
       );
     }
-    return copyWith(currentStep: step);
+    return copyWith(currentStep: step, collectedData: collectedData);
   }
 
   /// Retrieves a value from the collected data.

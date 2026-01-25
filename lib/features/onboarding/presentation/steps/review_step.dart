@@ -1,4 +1,5 @@
 import 'package:fitgenie_app/core/extensions/context_extensions.dart';
+import 'package:fitgenie_app/features/onboarding/domain/onboarding_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitgenie_app/core/constants/app_strings.dart';
@@ -326,7 +327,7 @@ class ReviewStep extends ConsumerWidget {
   }
 
   /// Formats weight for display.
-  String _formatWeight(state) {
+  String _formatWeight(OnboardingState state) {
     final weight = state.getData<double>('weight');
     final unit = state.getData<WeightUnit>('weightUnit');
     if (weight == null || unit == null) return 'Not set';
@@ -334,15 +335,19 @@ class ReviewStep extends ConsumerWidget {
   }
 
   /// Formats height for display.
-  String _formatHeight(state) {
+  String _formatHeight(OnboardingState state) {
     final height = state.getData<double>('height');
     final unit = state.getData<HeightUnit>('heightUnit');
     if (height == null || unit == null) return 'Not set';
-    return Formatters.height(height, unit.firestoreValue);
+    return Formatters.height(height, unit.displayName);
   }
 
   /// Builds goal display with icon.
-  Widget _buildGoalDisplay(state, ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildGoalDisplay(
+    OnboardingState state,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     final goal = state.getData<FitnessGoal>('goal');
     if (goal == null) {
       return Text('Not set', style: theme.textTheme.bodyMedium);
@@ -384,7 +389,7 @@ class ReviewStep extends ConsumerWidget {
 
   /// Builds equipment display.
   Widget _buildEquipmentDisplay(
-    state,
+    OnboardingState state,
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
@@ -441,7 +446,11 @@ class ReviewStep extends ConsumerWidget {
   }
 
   /// Builds dietary restrictions display.
-  Widget _buildDietaryDisplay(state, ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildDietaryDisplay(
+    OnboardingState state,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     final restrictions = state.getData<List<DietaryRestriction>>(
       'dietaryRestrictions',
     );
