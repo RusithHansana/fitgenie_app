@@ -343,7 +343,11 @@ class ReviewStep extends ConsumerWidget {
   }
 
   /// Builds goal display with icon.
-  Widget _buildGoalDisplay(state, ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildGoalDisplay(
+    OnboardingState state,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     final goal = state.getData<FitnessGoal>('goal');
     if (goal == null) {
       return Text('Not set', style: theme.textTheme.bodyMedium);
@@ -385,7 +389,7 @@ class ReviewStep extends ConsumerWidget {
 
   /// Builds equipment display.
   Widget _buildEquipmentDisplay(
-    state,
+    OnboardingState state,
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
@@ -442,7 +446,11 @@ class ReviewStep extends ConsumerWidget {
   }
 
   /// Builds dietary restrictions display.
-  Widget _buildDietaryDisplay(state, ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildDietaryDisplay(
+    OnboardingState state,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     final restrictions = state.getData<List<DietaryRestriction>>(
       'dietaryRestrictions',
     );
