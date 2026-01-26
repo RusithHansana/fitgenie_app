@@ -210,7 +210,7 @@ class OnboardingStateProvider extends _$OnboardingStateProvider {
 /// ```
 @riverpod
 Future<UserProfile?> userProfile(UserProfileRef ref) async {
-  final userId = ref.watch(firebase.currentUserIdProvider);
+  final userId = ref.watch(auth.currentUserIdProvider);
 
   if (userId == null) {
     return null; // Not authenticated
