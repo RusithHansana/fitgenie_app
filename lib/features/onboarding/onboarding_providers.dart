@@ -1,5 +1,5 @@
 import 'package:fitgenie_app/core/constants/dietary_options.dart';
-import 'package:hive/hive.dart';
+import 'package:fitgenie_app/shared/services/hive_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fitgenie_app/features/onboarding/data/onboarding_repository.dart';
 import 'package:fitgenie_app/features/onboarding/domain/onboarding_state.dart';
@@ -21,7 +21,7 @@ part 'onboarding_providers.g.dart';
 @riverpod
 OnboardingRepository onboardingRepository(OnboardingRepositoryRef ref) {
   final firestore = ref.watch(firebase.firestoreProvider);
-  final hiveBox = Hive.box('user_profiles');
+  final hiveBox = HiveService.userProfileBox;
 
   return OnboardingRepository(firestore: firestore, hiveBox: hiveBox);
 }
