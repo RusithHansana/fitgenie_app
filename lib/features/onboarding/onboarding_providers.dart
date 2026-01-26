@@ -280,7 +280,7 @@ Future<bool> isOnboardingComplete(IsOnboardingCompleteRef ref) async {
 /// ```
 @riverpod
 Future<UserProfile> saveUserProfile(SaveUserProfileRef ref) async {
-  final userId = ref.read(firebase.currentUserIdProvider);
+  final userId = ref.read(auth.currentUserIdProvider);
 
   if (userId == null) {
     throw Exception('User not authenticated');
