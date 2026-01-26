@@ -24,7 +24,7 @@ class AiConstants {
   /// - Speed: Fast response times for better UX
   /// - Quality: High-quality plan generation
   /// - Cost: Lower cost per request vs pro models
-  static const String modelName = 'gemini-1.5-flash';
+  static const String modelName = 'gemini-2.5-flash';
 
   // ==========================================================================
   // GENERATION PARAMETERS
