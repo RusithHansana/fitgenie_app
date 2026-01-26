@@ -1,3 +1,4 @@
+import 'package:fitgenie_app/shared/providers/logger_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -99,6 +100,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   /// Handles the generation action from review step.
   Future<void> _handleGenerate() async {
+    final logger = ref.read(loggerProvider);
     if (_isSaving) return; // Prevent duplicate saves
 
     setState(() {
@@ -118,6 +120,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         context.go('/plan-generation');
       }
     } catch (e) {
+      logger.e('Error saving user profile: $e');
       // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
