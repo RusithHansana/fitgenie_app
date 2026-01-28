@@ -99,8 +99,8 @@ class RetryHelper {
           rethrow;
         }
 
-        // Calculate exponential backoff delay
-        final delaySeconds = _calculateDelay(attempt);
+        // Calculate exponential backoff delay (AI-aware)
+        final delaySeconds = _calculateDelay(attempt, error);
 
         // Notify about retry
         onRetry?.call(attempt + 1, delaySeconds, error);
@@ -185,8 +185,14 @@ class RetryHelper {
   /// - Attempt 2: 1 * 2^2 = 4 seconds
   ///
   /// Returns delay in seconds.
-  static int _calculateDelay(int attempt) {
-    return baseDelaySeconds * pow(2, attempt).toInt();
+  static int _calculateDelay(int attempt, Object error) {
+    final baseDelay = baseDelaySeconds * pow(2, attempt).toInt();
+
+    if (error is AiException) {
+      return max(baseDelay, error.recommendedRetryDelaySeconds);
+    }
+
+    return baseDelay;
   }
 
   /// Default retry eligibility check.

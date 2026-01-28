@@ -5,6 +5,19 @@ import 'package:fitgenie_app/core/constants/ai_constants.dart';
 import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
 import 'package:fitgenie_app/core/utils/json_parser.dart';
 import 'package:fitgenie_app/core/utils/retry_helper.dart';
+import 'package:fitgenie_app/core/utils/rate_limiter.dart';
+
+/// Response validation modes for plan generation.
+enum PlanResponseType {
+  /// Full 7-day plan response.
+  fullPlan,
+
+  /// Partial days response (1-3 days).
+  partialDays,
+
+  /// Outline-only response for weekly structure.
+  outline,
+}
 
 /// Service for interacting with Google Gemini AI API.
 ///
@@ -66,6 +79,12 @@ class GeminiService {
 
   /// Whether the model has been initialized.
   bool _isInitialized = false;
+
+  /// Rate limiter to keep Gemini requests under 5 RPM.
+  static final RateLimiter _rateLimiter = RateLimiter(
+    maxRequests: 4,
+    window: const Duration(minutes: 1),
+  );
 
   /// Initializes the Gemini model with configuration.
   ///
@@ -142,11 +161,42 @@ class GeminiService {
   /// ```
   Future<Map<String, dynamic>> generatePlan(String prompt) async {
     return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
-      () => _executeGeneration(prompt),
+      () => _executeGeneration(prompt, responseType: PlanResponseType.fullPlan),
       onRetry: (attempt, delay, error) {
         // Log retry attempts for debugging
         logger.w(
           'Gemini generation retry $attempt after ${delay}s: ${error.toString()}',
+        );
+      },
+    );
+  }
+
+  /// Generates a weekly outline used for batched plan generation.
+  ///
+  /// Returns: Parsed JSON Map containing planId and dayOutline.
+  Future<Map<String, dynamic>> generatePlanOutline(String prompt) async {
+    return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
+      () => _executeGeneration(prompt, responseType: PlanResponseType.outline),
+      onRetry: (attempt, delay, error) {
+        logger.w(
+          'Gemini outline retry $attempt after ${delay}s: ${error.toString()}',
+        );
+      },
+    );
+  }
+
+  /// Generates a partial batch of plan days (1-3 days).
+  ///
+  /// Returns: Parsed JSON Map containing days array.
+  Future<Map<String, dynamic>> generatePlanBatch(String prompt) async {
+    return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
+      () => _executeGeneration(
+        prompt,
+        responseType: PlanResponseType.partialDays,
+      ),
+      onRetry: (attempt, delay, error) {
+        logger.w(
+          'Gemini batch retry $attempt after ${delay}s: ${error.toString()}',
         );
       },
     );
@@ -172,7 +222,7 @@ class GeminiService {
   /// ```
   Future<Map<String, dynamic>> modifyPlan(String prompt) async {
     return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
-      () => _executeGeneration(prompt),
+      () => _executeGeneration(prompt, responseType: PlanResponseType.fullPlan),
       onRetry: (attempt, delay, error) {
         logger.w(
           'Gemini modification retry $attempt after ${delay}s: ${error.toString()}',
@@ -185,7 +235,10 @@ class GeminiService {
   ///
   /// Internal method that performs the generation with timeout.
   /// This is separated from public methods to enable retry wrapping.
-  Future<Map<String, dynamic>> _executeGeneration(String prompt) async {
+  Future<Map<String, dynamic>> _executeGeneration(
+    String prompt, {
+    required PlanResponseType responseType,
+  }) async {
     if (!_isInitialized) {
       throw const AiException(
         AiErrorType.unknown,
@@ -194,6 +247,9 @@ class GeminiService {
     }
 
     try {
+      // Enforce request rate limiting
+      await _rateLimiter.acquire();
+
       // Generate content with timeout
       final response = await _model
           .generateContent([Content.text(prompt)])
@@ -228,8 +284,18 @@ class GeminiService {
       try {
         final jsonMap = JsonParser.parseGeminiResponse(text);
 
-        // Validate that we have required top-level fields
-        _validatePlanJson(jsonMap);
+        // Validate based on expected response type
+        switch (responseType) {
+          case PlanResponseType.fullPlan:
+            _validatePlanJson(jsonMap);
+            break;
+          case PlanResponseType.partialDays:
+            _validatePartialPlanJson(jsonMap);
+            break;
+          case PlanResponseType.outline:
+            _validateOutlineJson(jsonMap);
+            break;
+        }
 
         return jsonMap;
       } on AiException {
@@ -295,6 +361,107 @@ class GeminiService {
         AiErrorType.invalidResponse,
         'Plan must have exactly 7 days, got ${days.length}',
       );
+    }
+  }
+
+  /// Validates that the parsed JSON contains required fields for a batch.
+  ///
+  /// Checks for:
+  /// - 'days' field exists and is a list
+  /// - 'days' list has 1-3 items
+  /// - each day has a valid dayIndex
+  void _validatePartialPlanJson(Map<String, dynamic> json) {
+    if (!json.containsKey('days')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Plan batch JSON missing required field: days',
+      );
+    }
+
+    final days = json['days'];
+    if (days is! List) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Plan batch field "days" must be a list, got ${days.runtimeType}',
+      );
+    }
+
+    if (days.isEmpty || days.length > 3) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Plan batch must include 1-3 days, got ${days.length}',
+      );
+    }
+
+    for (final day in days) {
+      if (day is! Map<String, dynamic>) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each day must be a JSON object',
+        );
+      }
+
+      if (!day.containsKey('dayIndex')) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each day must include dayIndex',
+        );
+      }
+    }
+  }
+
+  /// Validates that the outline JSON has all required fields.
+  ///
+  /// Checks for:
+  /// - 'planId' field exists
+  /// - 'dayOutline' list with exactly 7 items
+  /// - each outline item has dayIndex, workoutType, intensity
+  void _validateOutlineJson(Map<String, dynamic> json) {
+    if (!json.containsKey('planId')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Outline JSON missing required field: planId',
+      );
+    }
+
+    if (!json.containsKey('dayOutline')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Outline JSON missing required field: dayOutline',
+      );
+    }
+
+    final outline = json['dayOutline'];
+    if (outline is! List) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Outline field "dayOutline" must be a list, got ${outline.runtimeType}',
+      );
+    }
+
+    if (outline.length != 7) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Outline must have exactly 7 days, got ${outline.length}',
+      );
+    }
+
+    for (final day in outline) {
+      if (day is! Map<String, dynamic>) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each outline day must be a JSON object',
+        );
+      }
+
+      if (!day.containsKey('dayIndex') ||
+          !day.containsKey('workoutType') ||
+          !day.containsKey('intensity')) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each outline day must include dayIndex, workoutType, intensity',
+        );
+      }
     }
   }
 
@@ -379,6 +546,9 @@ class GeminiService {
     }
 
     try {
+      // Enforce request rate limiting
+      await _rateLimiter.acquire();
+
       final response = await _model
           .generateContent([Content.text(message)])
           .timeout(
