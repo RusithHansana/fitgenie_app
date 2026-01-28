@@ -95,7 +95,7 @@ class DaySelector extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSizes.spacingSm,
-              vertical: AppSizes.spacingMd,
+              vertical: AppSizes.spacingSm,
             ),
             itemCount: days.length,
             itemBuilder: (context, index) {
