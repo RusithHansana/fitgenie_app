@@ -166,7 +166,7 @@ Future<WeeklyPlan> generatePlan(GeneratePlanRef ref) async {
 
   // Generate plan via repository
   final repository = ref.watch(planRepositoryProvider);
-  final plan = await repository.generatePlan(profile);
+  final plan = await repository.generatePlan(userId, profile);
 
   // Invalidate current plan provider to trigger refresh
   ref.invalidate(currentPlanProvider);

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:fitgenie_app/features/onboarding/domain/user_profile.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
 import 'package:fitgenie_app/core/constants/dietary_options.dart';
@@ -178,6 +180,172 @@ IMPORTANT NOTES:
 - Include at least 1-2 rest days
 
 Generate a complete, personalized 7-day plan now:
+''';
+  }
+
+  /// Builds a prompt for generating a lightweight weekly outline.
+  ///
+  /// The outline is used to ensure safe intensity progression across batches.
+  /// It must cover all 7 days with workout type and intensity guidance.
+  ///
+  /// Parameters:
+  /// - [profile]: The user's profile
+  /// - [planId]: Pre-generated plan ID to keep consistent across batches
+  /// - [weekStartDate]: Monday date for the plan week
+  ///
+  /// Returns: Prompt string that requests an outline JSON only.
+  static String buildOutlinePrompt(
+    UserProfile profile,
+    String planId,
+    DateTime weekStartDate,
+  ) {
+    final contextString = profile.toPromptContext();
+    final weekStartIso = weekStartDate.toIso8601String();
+
+    return '''
+You are FitGenie, an expert AI personal trainer and nutritionist.
+
+Your task is to create a SAFE weekly outline only (no full workouts or meals).
+This outline will guide separate batch generation requests.
+
+=== USER PROFILE ===
+$contextString
+
+=== CRITICAL CONSTRAINTS ===
+1. EQUIPMENT: ONLY use ${_formatEquipment(profile)}
+2. DIETARY: RESPECT ${_formatDietaryRestrictions(profile)}
+3. SAFETY:
+   - No unsafe exercises for the user's experience level
+   - Include 1-2 rest/low-intensity days
+   - Avoid back-to-back high-intensity days
+   - If a day is high intensity, the next day must be rest or low intensity
+
+=== OUTPUT FORMAT (JSON ONLY) ===
+Respond with ONLY valid JSON matching this schema:
+
+{
+  "planId": "$planId",
+  "weekStartDate": "$weekStartIso",
+  "dayOutline": [
+    {
+      "dayIndex": 0,
+      "workoutType": "strength|cardio|flexibility|rest",
+      "intensity": "low|moderate|high",
+      "focus": "Upper body strength",
+      "mealTheme": "High-protein balanced"
+    }
+  ]
+}
+
+IMPORTANT:
+- Include ALL 7 days (dayIndex 0-6, Monday-Sunday)
+- Ensure intensity progression across the full week
+- Keep focus and mealTheme concise
+
+Generate the 7-day outline now:
+''';
+  }
+
+  /// Builds a prompt for generating a batch of 1-3 days using the outline.
+  ///
+  /// Parameters:
+  /// - [profile]: The user's profile
+  /// - [outline]: Outline JSON from buildOutlinePrompt
+  /// - [previousDays]: Compact summaries of prior generated days
+  /// - [startDayIndex]: First day index for this batch (0-6)
+  /// - [endDayIndex]: Last day index for this batch (0-6)
+  /// - [weekStartDate]: Monday date for the plan week
+  static String buildBatchPrompt(
+    UserProfile profile,
+    Map<String, dynamic> outline,
+    List<Map<String, dynamic>> previousDays,
+    int startDayIndex,
+    int endDayIndex,
+    DateTime weekStartDate,
+  ) {
+    final contextString = profile.toPromptContext();
+    final outlineJson = jsonEncode(outline);
+    final previousJson = jsonEncode(previousDays);
+    final weekStartIso = weekStartDate.toIso8601String();
+
+    return '''
+You are FitGenie, an expert AI personal trainer and nutritionist.
+
+Your task is to generate ONLY the requested day range for a weekly plan.
+You MUST follow the outline to ensure safe intensity progression.
+
+=== USER PROFILE ===
+$contextString
+
+=== OUTLINE (AUTHORITATIVE) ===
+$outlineJson
+
+=== PREVIOUSLY GENERATED DAYS (SUMMARY) ===
+$previousJson
+
+=== CRITICAL CONSTRAINTS ===
+1. EQUIPMENT: ONLY use ${_formatEquipment(profile)}
+2. DIETARY: RESPECT ${_formatDietaryRestrictions(profile)}
+3. SAFETY:
+   - Follow the outline's workoutType and intensity
+   - If previous day is high intensity, next day must be rest or low intensity
+   - Avoid unsafe exercises for the user's experience level
+
+=== REQUIRED OUTPUT FORMAT ===
+Respond with ONLY valid JSON matching this schema:
+
+{
+  "planId": "${outline['planId']}",
+  "days": [
+    {
+      "id": "unique-day-id",
+      "dayIndex": $startDayIndex,
+      "date": "$weekStartIso",
+      "workout": {
+        "id": "unique-workout-id",
+        "name": "Workout Name",
+        "type": "strength|cardio|flexibility|rest",
+        "durationMinutes": 45,
+        "exercises": [
+          {
+            "id": "unique-exercise-id",
+            "name": "Exercise Name",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 90,
+            "notes": "Form cues and tips",
+            "equipmentRequired": ["dumbbells"],
+            "isComplete": false
+          }
+        ]
+      },
+      "meals": [
+        {
+          "id": "unique-meal-id",
+          "name": "Meal Name",
+          "type": "breakfast|lunch|dinner|snack",
+          "calories": 500,
+          "protein": 30,
+          "carbs": 50,
+          "fat": 15,
+          "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
+          "instructions": "Brief preparation steps",
+          "dietaryInfo": ["Vegetarian", "Gluten-free"],
+          "isComplete": false
+        }
+      ]
+    }
+  ]
+}
+
+IMPORTANT:
+- Generate ONLY days $startDayIndex to $endDayIndex (inclusive)
+- Use correct dayIndex values for each day
+- Use dates based on weekStartDate: $weekStartIso (Monday)
+- For rest days, set workout.type to "rest" and exercises to an empty array
+- Set isComplete=false for all exercises and meals
+
+Generate this batch now:
 ''';
   }
 

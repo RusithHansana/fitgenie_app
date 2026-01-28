@@ -40,7 +40,7 @@ import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
 /// );
 ///
 /// // Generate new plan
-/// final plan = await repository.generatePlan(userProfile);
+/// final plan = await repository.generatePlan(userId, userProfile);
 ///
 /// // Get current plan (offline-first)
 /// final current = await repository.getCurrentPlan(userId);
@@ -93,6 +93,7 @@ class PlanRepository {
   /// 7. Return generated plan
   ///
   /// Parameters:
+  /// - [userId]: Authenticated user ID
   /// - [profile]: User's complete profile with biometrics and preferences
   ///
   /// Returns: Newly generated WeeklyPlan
@@ -104,55 +105,108 @@ class PlanRepository {
   /// Example:
   /// ```dart
   /// try {
-  ///   final plan = await repository.generatePlan(userProfile);
+  ///   final plan = await repository.generatePlan(userId, userProfile);
   ///   print('Generated plan: ${plan.dateRangeDisplay}');
   /// } on AiException catch (e) {
   ///   print('Generation failed: ${e.userFriendlyMessage}');
   /// }
   /// ```
-  Future<WeeklyPlan> generatePlan(UserProfile profile) async {
-    // Step 1: Build AI prompt with user context
-    final prompt = PromptBuilder.buildGenerationPrompt(profile);
-
-    // Step 2: Generate plan via Gemini (with automatic retry)
-    final planJson = await _geminiService.generatePlan(prompt);
-
-    // Step 3: Create WeeklyPlan from response
-    // Add metadata that AI might not include
+  Future<WeeklyPlan> generatePlan(String userId, UserProfile profile) async {
+    if (userId.isEmpty) {
+      throw StateError('User must be authenticated to generate plan');
+    }
+    // Step 1: Prepare base metadata
     final now = DateTime.now();
     final monday = _getStartOfWeek(now);
+    final planId = 'plan_${now.millisecondsSinceEpoch}';
 
-    // Ensure required fields exist
-    planJson['userId'] = profile.toJson()['userId'] ?? 'unknown';
+    // Step 2: Generate outline for safe weekly structure
+    final outlinePrompt = PromptBuilder.buildOutlinePrompt(
+      profile,
+      planId,
+      monday,
+    );
+    final outlineJson = await _geminiService.generatePlanOutline(outlinePrompt);
+    final outline = _normalizeOutline(outlineJson, planId, monday);
+
+    // Step 3: Generate plan in batches (3 + 3 + 1 days)
+    final daysByIndex = <int, Map<String, dynamic>>{};
+    final previousDaysSummary = <Map<String, dynamic>>[];
+
+    const batches = [_PlanBatch(0, 2), _PlanBatch(3, 5), _PlanBatch(6, 6)];
+
+    for (final batch in batches) {
+      final batchPrompt = PromptBuilder.buildBatchPrompt(
+        profile,
+        outline,
+        previousDaysSummary,
+        batch.startDayIndex,
+        batch.endDayIndex,
+        monday,
+      );
+
+      final batchJson = await _geminiService.generatePlanBatch(batchPrompt);
+      final batchDays = _extractBatchDays(
+        batchJson,
+        batch.startDayIndex,
+        batch.endDayIndex,
+      );
+
+      for (final day in batchDays) {
+        final dayIndex = _coerceDayIndex(day['dayIndex']);
+        if (dayIndex < batch.startDayIndex || dayIndex > batch.endDayIndex) {
+          throw AiException(
+            AiErrorType.invalidResponse,
+            'Batch returned out-of-range dayIndex $dayIndex',
+          );
+        }
+
+        if (daysByIndex.containsKey(dayIndex)) {
+          throw AiException(
+            AiErrorType.invalidResponse,
+            'Duplicate dayIndex $dayIndex in batch response',
+          );
+        }
+
+        day['dayIndex'] = dayIndex;
+        day['date'] = monday.add(Duration(days: dayIndex)).toIso8601String();
+        _validateDayMatchesOutline(day, outline);
+
+        daysByIndex[dayIndex] = day;
+        previousDaysSummary.add(_summarizeDayForPrompt(day, outline));
+      }
+    }
+
+    if (daysByIndex.length != 7) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Plan must contain 7 days after batching, got ${daysByIndex.length}',
+      );
+    }
+
+    final days = List<Map<String, dynamic>>.generate(
+      7,
+      (index) => daysByIndex[index]!,
+    );
+
+    final planJson = <String, dynamic>{'id': planId, 'days': days};
+
+    // Step 4: Attach metadata
+    planJson['userId'] = userId;
     planJson['createdAt'] = now.toIso8601String();
     planJson['startDate'] = monday.toIso8601String();
     planJson['profileSnapshot'] = profile.toJson();
 
-    // Generate unique ID if not provided by AI
-    if (!planJson.containsKey('id') || planJson['id'] == null) {
-      planJson['id'] = 'plan_${now.millisecondsSinceEpoch}';
-    }
-
-    // Enrich days with proper dates
-    if (planJson.containsKey('days') && planJson['days'] is List) {
-      final days = planJson['days'] as List;
-      for (int i = 0; i < days.length && i < 7; i++) {
-        final day = days[i] as Map<String, dynamic>;
-        day['dayIndex'] = i;
-        day['date'] = monday.add(Duration(days: i)).toIso8601String();
-      }
-    }
-
-    // Parse to WeeklyPlan model
+    // Step 5: Parse to WeeklyPlan model
     final plan = WeeklyPlan.fromJson(planJson);
 
     // Validate plan structure
     plan.validate();
 
-    // Step 4: Cache locally (offline access)
+    // Step 6: Cache locally (offline access)
     await _localDatasource.savePlan(plan.userId, plan);
 
-    // Step 5: Sync to Firestore (best effort, don't throw on failure)
+    // Step 7: Sync to Firestore (best effort, don't throw on failure)
     try {
       await _remoteDatasource.savePlan(plan.userId, plan);
     } catch (e) {
@@ -498,4 +552,190 @@ class PlanRepository {
       date.day,
     ).subtract(Duration(days: daysFromMonday));
   }
+
+  // ======================================================================
+  // BATCH GENERATION HELPERS
+  // ======================================================================
+
+  Map<String, dynamic> _normalizeOutline(
+    Map<String, dynamic> outline,
+    String planId,
+    DateTime weekStart,
+  ) {
+    outline['planId'] = outline['planId'] ?? planId;
+    outline['weekStartDate'] =
+        outline['weekStartDate'] ?? weekStart.toIso8601String();
+
+    final dayOutline = outline['dayOutline'];
+    if (dayOutline is! List || dayOutline.length != 7) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Outline must include dayOutline with 7 days',
+      );
+    }
+
+    return outline;
+  }
+
+  List<Map<String, dynamic>> _extractBatchDays(
+    Map<String, dynamic> batchJson,
+    int startDayIndex,
+    int endDayIndex,
+  ) {
+    if (!batchJson.containsKey('days') || batchJson['days'] is! List) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Batch response missing days array',
+      );
+    }
+
+    final days = batchJson['days'] as List;
+    if (days.isEmpty || days.length > 3) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Batch must return 1-3 days, got ${days.length}',
+      );
+    }
+
+    final parsedDays = <Map<String, dynamic>>[];
+    for (final day in days) {
+      if (day is! Map<String, dynamic>) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each day must be a JSON object',
+        );
+      }
+      parsedDays.add(day);
+    }
+
+    // Ensure the batch includes the expected indices range
+    for (final day in parsedDays) {
+      final index = _coerceDayIndex(day['dayIndex']);
+      if (index < startDayIndex || index > endDayIndex) {
+        throw AiException(
+          AiErrorType.invalidResponse,
+          'Batch returned unexpected dayIndex $index',
+        );
+      }
+    }
+
+    return parsedDays;
+  }
+
+  int _coerceDayIndex(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+
+    throw AiException(
+      AiErrorType.invalidResponse,
+      'Invalid dayIndex value: $value',
+    );
+  }
+
+  Map<String, dynamic> _summarizeDayForPrompt(
+    Map<String, dynamic> day,
+    Map<String, dynamic> outline,
+  ) {
+    final dayIndex = _coerceDayIndex(day['dayIndex']);
+    final workout = day['workout'] as Map<String, dynamic>?;
+    final workoutType = workout?['type'] ?? 'rest';
+    final workoutName = workout?['name'] ?? 'Rest';
+    final intensity = _outlineIntensityForDay(outline, dayIndex);
+
+    return {
+      'dayIndex': dayIndex,
+      'workoutType': workoutType,
+      'workoutName': workoutName,
+      'intensity': intensity,
+    };
+  }
+
+  String _outlineIntensityForDay(Map<String, dynamic> outline, int dayIndex) {
+    final dayOutline = outline['dayOutline'];
+    if (dayOutline is! List) return 'unknown';
+
+    for (final entry in dayOutline) {
+      if (entry is Map<String, dynamic> &&
+          _coerceDayIndex(entry['dayIndex']) == dayIndex) {
+        return entry['intensity']?.toString() ?? 'unknown';
+      }
+    }
+
+    return 'unknown';
+  }
+
+  void _validateDayMatchesOutline(
+    Map<String, dynamic> day,
+    Map<String, dynamic> outline,
+  ) {
+    final dayIndex = _coerceDayIndex(day['dayIndex']);
+    final dayOutline = outline['dayOutline'];
+    if (dayOutline is! List) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Outline missing dayOutline list',
+      );
+    }
+
+    Map<String, dynamic>? outlineEntry;
+    for (final entry in dayOutline) {
+      if (entry is Map<String, dynamic> &&
+          _coerceDayIndex(entry['dayIndex']) == dayIndex) {
+        outlineEntry = entry;
+        break;
+      }
+    }
+
+    if (outlineEntry == null) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Outline missing entry for dayIndex $dayIndex',
+      );
+    }
+
+    final expectedType = outlineEntry['workoutType']?.toString();
+    final workout = day['workout'] as Map<String, dynamic>?;
+    final actualType = workout?['type']?.toString();
+
+    if (expectedType == null || expectedType.isEmpty) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Outline dayIndex $dayIndex missing workoutType',
+      );
+    }
+
+    if (expectedType == 'rest') {
+      if (actualType != 'rest') {
+        throw AiException(
+          AiErrorType.invalidResponse,
+          'Day $dayIndex must be rest per outline',
+        );
+      }
+
+      final exercises = workout?['exercises'];
+      if (exercises is List && exercises.isNotEmpty) {
+        throw AiException(
+          AiErrorType.invalidResponse,
+          'Rest day $dayIndex should not include exercises',
+        );
+      }
+    } else if (actualType != expectedType) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Day $dayIndex workoutType mismatch: expected $expectedType, got $actualType',
+      );
+    }
+  }
+}
+
+class _PlanBatch {
+  final int startDayIndex;
+  final int endDayIndex;
+
+  const _PlanBatch(this.startDayIndex, this.endDayIndex);
 }
