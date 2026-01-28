@@ -57,6 +57,31 @@ class PlanLocalDatasource {
   /// - [logger]: Logger instance for tracking operations
   const PlanLocalDatasource({required this.logger});
 
+  /// Normalizes dynamic JSON-like data from Hive into a `Map<String, dynamic>`.
+  ///
+  /// Hive stores maps with dynamic keys, which can break Freezed JSON casts.
+  /// This recursively converts map keys to strings and normalizes nested maps
+  /// and lists to ensure `WeeklyPlan.fromJson` receives safe data.
+  Map<String, dynamic> _normalizeJsonMap(dynamic value) {
+    final normalized = _normalizeJsonValue(value);
+    if (normalized is Map<String, dynamic>) {
+      return normalized;
+    }
+    return <String, dynamic>{};
+  }
+
+  dynamic _normalizeJsonValue(dynamic value) {
+    if (value is Map) {
+      return value.map(
+        (key, val) => MapEntry(key.toString(), _normalizeJsonValue(val)),
+      );
+    }
+    if (value is List) {
+      return value.map(_normalizeJsonValue).toList();
+    }
+    return value;
+  }
+
   /// Generates the Hive storage key for a user's plan.
   ///
   /// Format: `plan_{userId}`
@@ -128,8 +153,8 @@ class PlanLocalDatasource {
         return null;
       }
 
-      // Convert to Map<String, dynamic>
-      final planJson = Map<String, dynamic>.from(planData);
+      // Convert to Map<String, dynamic> (deep normalization)
+      final planJson = _normalizeJsonMap(planData);
 
       // Deserialize to WeeklyPlan
       return WeeklyPlan.fromJson(planJson);
@@ -288,7 +313,7 @@ class PlanLocalDatasource {
         return null;
       }
 
-      final planJson = Map<String, dynamic>.from(planData);
+      final planJson = _normalizeJsonMap(planData);
 
       // Extract just metadata fields
       return {
