@@ -123,7 +123,8 @@ $contextString
 - For each meal, populate "dietaryInfo" with applicable restriction labels
 
 === REQUIRED OUTPUT FORMAT ===
-You MUST respond with ONLY valid JSON matching this EXACT schema. No markdown, no explanations, just the JSON object:
+You MUST respond with ONLY valid JSON matching this EXACT schema. No markdown, no explanations.
+Output must be minified JSON with no extra whitespace, line breaks, or indentation.
 
 {
   "id": "unique-plan-id",
@@ -221,7 +222,8 @@ $contextString
    - If a day is high intensity, the next day must be rest or low intensity
 
 === OUTPUT FORMAT (JSON ONLY) ===
-Respond with ONLY valid JSON matching this schema:
+Respond with ONLY valid JSON matching this schema.
+Output must be minified JSON with no extra whitespace, line breaks, or indentation.
 
 {
   "planId": "$planId",
@@ -292,7 +294,8 @@ $previousJson
    - Avoid unsafe exercises for the user's experience level
 
 === REQUIRED OUTPUT FORMAT ===
-Respond with ONLY valid JSON matching this schema:
+Respond with ONLY valid JSON matching this schema.
+Output must be minified JSON with no extra whitespace, line breaks, or indentation.
 
 {
   "planId": "${outline['planId']}",
