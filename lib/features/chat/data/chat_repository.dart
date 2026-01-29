@@ -515,15 +515,6 @@ class ChatRepository {
     );
   }
 
-  /// Builds a user-friendly modification confirmation message.
-  String _buildModificationConfirmation(
-    String userRequest,
-    Map<String, dynamic> modifiedData,
-  ) {
-    // Default confirmation
-    return AppStrings.chatModificationConfirmation;
-  }
-
   /// Gets a user-friendly error message from an exception.
   String _getErrorMessage(Object error) {
     if (error is AiException) {
