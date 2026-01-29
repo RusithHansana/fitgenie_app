@@ -281,8 +281,8 @@ class ChatRepository {
     required ModificationRequest request,
     required WeeklyPlan currentPlan,
   }) async {
-    // Build modification prompt
-    final prompt = PromptBuilder.buildModificationPrompt(
+    // Build partial modification prompt
+    final prompt = PromptBuilder.buildPartialModificationPrompt(
       currentPlan,
       request.userRequest,
     );
@@ -290,7 +290,7 @@ class ChatRepository {
     // Call AI with retry logic
     final modifiedPlanData =
         await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
-          () => geminiService.modifyPlan(prompt),
+          () => geminiService.modifyPlanPartial(prompt),
           onRetry: (attempt, delay, error) {
             logger.w(
               'Retry modification attempt $attempt after ${delay}s: ${error.toString()}',
@@ -428,22 +428,22 @@ class ChatRepository {
     );
   }
 
-  /// Handles a modification request through AI.
+  /// Handles a modification request through AI using partial updates.
   Future<ChatMessage> _handleModificationRequest({
     required String userId,
     required ChatMessage userMessage,
     required WeeklyPlan currentPlan,
   }) async {
-    // Build modification prompt
-    final prompt = PromptBuilder.buildModificationPrompt(
+    // Build partial modification prompt
+    final prompt = PromptBuilder.buildPartialModificationPrompt(
       currentPlan,
       userMessage.content,
     );
 
-    // Call AI with retry logic
+    // Call AI with retry logic for partial modification
     final modifiedPlanData =
         await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
-          () => geminiService.modifyPlan(prompt),
+          () => geminiService.modifyPlanPartial(prompt),
           onRetry: (attempt, delay, error) {
             logger.w(
               'Modification retry $attempt after ${delay}s: ${error.toString()}',
@@ -451,15 +451,27 @@ class ChatRepository {
           },
         );
 
-    // Create confirmation message
-    final responseContent = _buildModificationConfirmation(
-      userMessage.content,
-      modifiedPlanData,
-    );
+    // Check for rejection
+    if (modifiedPlanData['modificationType'] == 'rejected') {
+      final explanation = modifiedPlanData['explanation'] as String? ??
+          'This type of modification is not supported.';
+      return ChatMessage(
+        id: _uuid.v4(),
+        content: explanation,
+        role: MessageRole.assistant,
+        timestamp: DateTime.now(),
+        isModificationRequest: true,
+        modificationApplied: false,
+      );
+    }
+
+    // Create confirmation message with AI's explanation
+    final explanation = modifiedPlanData['explanation'] as String? ??
+        AppStrings.chatModificationConfirmation;
 
     return ChatMessage(
       id: _uuid.v4(),
-      content: responseContent,
+      content: explanation,
       role: MessageRole.assistant,
       timestamp: DateTime.now(),
       isModificationRequest: true,

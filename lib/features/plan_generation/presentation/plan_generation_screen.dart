@@ -271,6 +271,8 @@ class _PlanGenerationScreenState extends ConsumerState<PlanGenerationScreen> {
         return AppStrings.errorAiParseError;
       case AiErrorType.contentFiltered:
         return AppStrings.errorAiContentFiltered;
+      case AiErrorType.invalidRequest:
+        return 'This type of modification is not supported. Try changing specific days or meals instead.';
       case AiErrorType.unknown:
         return AppStrings.errorUnknown;
     }

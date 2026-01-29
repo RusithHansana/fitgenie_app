@@ -17,6 +17,9 @@ enum PlanResponseType {
 
   /// Outline-only response for weekly structure.
   outline,
+
+  /// Partial modification response (changed days only).
+  partialModification,
 }
 
 /// Service for interacting with Google Gemini AI API.
@@ -220,12 +223,50 @@ class GeminiService {
   /// final modifiedJson = await service.modifyPlan(modPrompt);
   /// final updatedPlan = WeeklyPlan.fromJson(modifiedJson);
   /// ```
+  @Deprecated('Use modifyPlanPartial instead for partial modifications')
   Future<Map<String, dynamic>> modifyPlan(String prompt) async {
     return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
       () => _executeGeneration(prompt, responseType: PlanResponseType.fullPlan),
       onRetry: (attempt, delay, error) {
         logger.w(
           'Gemini modification retry $attempt after ${delay}s: ${error.toString()}',
+        );
+      },
+    );
+  }
+
+  /// Modifies an existing plan with partial updates.
+  ///
+  /// Returns only the modified days/items, not the full plan.
+  /// The repository will merge these changes with the existing plan.
+  ///
+  /// Parameters:
+  /// - [prompt]: Partial modification prompt from PromptBuilder
+  ///
+  /// Returns: Parsed JSON Map with modification result containing:
+  /// - modificationType: dayReplacement, workoutUpdate, mealUpdate, rejected
+  /// - modifiedDays: Array of changed days only
+  /// - explanation: AI's description of changes
+  ///
+  /// Throws:
+  /// - [AiException] with appropriate error type for all failures
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = await service.modifyPlanPartial(prompt);
+  /// if (result['modificationType'] == 'rejected') {
+  ///   throw AiException(AiErrorType.invalidRequest, result['explanation']);
+  /// }
+  /// ```
+  Future<Map<String, dynamic>> modifyPlanPartial(String prompt) async {
+    return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
+      () => _executeGeneration(
+        prompt,
+        responseType: PlanResponseType.partialModification,
+      ),
+      onRetry: (attempt, delay, error) {
+        logger.w(
+          'Gemini partial modification retry $attempt after ${delay}s: ${error.toString()}',
         );
       },
     );
@@ -294,6 +335,9 @@ class GeminiService {
             break;
           case PlanResponseType.outline:
             _validateOutlineJson(jsonMap);
+            break;
+          case PlanResponseType.partialModification:
+            _validatePartialModificationJson(jsonMap);
             break;
         }
 
@@ -460,6 +504,100 @@ class GeminiService {
         throw const AiException(
           AiErrorType.invalidResponse,
           'Each outline day must include dayIndex, workoutType, intensity',
+        );
+      }
+    }
+  }
+
+  /// Validates that the partial modification JSON has required fields.
+  ///
+  /// Checks for:
+  /// - 'modificationType' field exists and is valid
+  /// - 'modifiedDays' field exists (can be empty for rejected)
+  /// - 'explanation' field exists
+  /// - each modified day has valid dayIndex (0-6)
+  void _validatePartialModificationJson(Map<String, dynamic> json) {
+    // Check for required modificationType field
+    if (!json.containsKey('modificationType')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Modification response missing required field: modificationType',
+      );
+    }
+
+    final modificationType = json['modificationType'];
+    final validTypes = ['dayReplacement', 'workoutUpdate', 'mealUpdate', 'rejected'];
+    if (!validTypes.contains(modificationType)) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Invalid modificationType: $modificationType. Must be one of: $validTypes',
+      );
+    }
+
+    // Check for explanation field
+    if (!json.containsKey('explanation')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Modification response missing required field: explanation',
+      );
+    }
+
+    // For rejected modifications, modifiedDays can be empty
+    if (modificationType == 'rejected') {
+      return;
+    }
+
+    // For accepted modifications, validate modifiedDays
+    if (!json.containsKey('modifiedDays')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Modification response missing required field: modifiedDays',
+      );
+    }
+
+    final modifiedDays = json['modifiedDays'];
+    if (modifiedDays is! List) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'modifiedDays must be a list, got ${modifiedDays.runtimeType}',
+      );
+    }
+
+    if (modifiedDays.isEmpty) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'modifiedDays must contain at least one day for non-rejected modifications',
+      );
+    }
+
+    if (modifiedDays.length > 7) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'modifiedDays cannot exceed 7 days, got ${modifiedDays.length}',
+      );
+    }
+
+    // Validate each modified day
+    for (final day in modifiedDays) {
+      if (day is! Map<String, dynamic>) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each modified day must be a JSON object',
+        );
+      }
+
+      if (!day.containsKey('dayIndex')) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each modified day must include dayIndex',
+        );
+      }
+
+      final dayIndex = day['dayIndex'];
+      if (dayIndex is! int || dayIndex < 0 || dayIndex > 6) {
+        throw AiException(
+          AiErrorType.invalidResponse,
+          'dayIndex must be an integer 0-6, got $dayIndex',
         );
       }
     }

@@ -409,26 +409,26 @@ class PlanRepository {
     return updatedPlan;
   }
 
-  /// Modifies the current plan based on user request.
+  /// Modifies the current plan based on user request using partial updates.
   ///
-  /// Uses Gemini AI to interpret the modification request and
-  /// regenerate the affected portions of the plan.
+  /// Uses Gemini AI to interpret the modification request and returns
+  /// only the modified days/items, which are merged into the existing plan.
   ///
   /// Parameters:
   /// - [userId]: ID of the user
   /// - [modificationRequest]: Natural language modification request
   ///
-  /// Returns: Modified WeeklyPlan
+  /// Returns: Modified WeeklyPlan with merged changes
   ///
   /// Throws:
-  /// - [AiException] if modification fails
+  /// - [AiException] if modification fails or is rejected
   /// - [StateError] if no current plan exists
   ///
   /// Example:
   /// ```dart
   /// final modified = await repository.modifyPlan(
   ///   userId,
-  ///   'Make all Tuesday meals vegetarian',
+  ///   'Make Tuesday lunch vegetarian',
   /// );
   /// ```
   Future<WeeklyPlan> modifyPlan(
@@ -441,39 +441,103 @@ class PlanRepository {
       throw StateError('No current plan to modify');
     }
 
-    // Build modification prompt
-    final prompt = PromptBuilder.buildModificationPrompt(
+    // Build partial modification prompt
+    final prompt = PromptBuilder.buildPartialModificationPrompt(
       currentPlan,
       modificationRequest,
     );
 
-    // Get modified plan from AI
-    final modifiedJson = await _geminiService.modifyPlan(prompt);
+    // Get partial modification from AI
+    final resultJson = await _geminiService.modifyPlanPartial(prompt);
 
-    // Preserve metadata from current plan
-    modifiedJson['id'] = currentPlan.id;
-    modifiedJson['userId'] = currentPlan.userId;
-    modifiedJson['createdAt'] = currentPlan.createdAt.toIso8601String();
-    modifiedJson['startDate'] = currentPlan.startDate.toIso8601String();
-    modifiedJson['profileSnapshot'] = currentPlan.profileSnapshot;
+    // Check for rejection
+    if (resultJson['modificationType'] == 'rejected') {
+      throw AiException(
+        AiErrorType.invalidRequest,
+        resultJson['explanation'] ?? 'Full plan modifications are not supported',
+      );
+    }
 
-    // Parse modified plan
-    final modifiedPlan = WeeklyPlan.fromJson(modifiedJson);
+    // Merge changes into existing plan
+    final modifiedPlan = _mergePlanChanges(currentPlan, resultJson);
 
     // Validate
     modifiedPlan.validate();
 
-    // Update local cache
+    // Update local cache (full plan)
     await _localDatasource.savePlan(userId, modifiedPlan);
 
-    // Sync to remote
+    // Sync partial changes to remote
     try {
-      await _remoteDatasource.savePlan(userId, modifiedPlan);
+      await _syncPartialChanges(userId, currentPlan.id, resultJson);
     } catch (e) {
       logger.w('Failed to sync modified plan', error: e);
     }
 
     return modifiedPlan;
+  }
+
+  /// Merges partial changes from AI response into the existing plan.
+  ///
+  /// Creates a new WeeklyPlan with the modified days replaced.
+  WeeklyPlan _mergePlanChanges(
+    WeeklyPlan currentPlan,
+    Map<String, dynamic> changes,
+  ) {
+    final modifiedDays = changes['modifiedDays'] as List<dynamic>;
+    
+    // Create a mutable copy of the days list
+    final updatedDays = List<DayPlan>.from(currentPlan.days);
+    
+    // Replace modified days
+    for (final dayJson in modifiedDays) {
+      final dayIndex = dayJson['dayIndex'] as int;
+      
+      // Preserve existing day's id if not provided
+      if (!dayJson.containsKey('id') || dayJson['id'] == null) {
+        dayJson['id'] = currentPlan.days[dayIndex].id;
+      }
+      
+      // Preserve date if not provided
+      if (!dayJson.containsKey('date') || dayJson['date'] == null) {
+        dayJson['date'] = currentPlan.days[dayIndex].date.toIso8601String();
+      }
+      
+      // Parse the modified day
+      final modifiedDay = DayPlan.fromJson(dayJson as Map<String, dynamic>);
+      
+      // Replace in list
+      updatedDays[dayIndex] = modifiedDay;
+    }
+    
+    // Create new plan with updated days
+    return currentPlan.copyWith(days: updatedDays);
+  }
+
+  /// Syncs partial changes to Firestore using field paths.
+  ///
+  /// Only updates the specific days that were modified, not the entire plan.
+  Future<void> _syncPartialChanges(
+    String userId,
+    String planId,
+    Map<String, dynamic> changes,
+  ) async {
+    final modifiedDays = changes['modifiedDays'] as List<dynamic>;
+    
+    // Build day updates map: dayIndex -> day data
+    final dayUpdates = <int, Map<String, dynamic>>{};
+    
+    for (final dayJson in modifiedDays) {
+      final dayIndex = dayJson['dayIndex'] as int;
+      
+      // Convert to Firestore format
+      final dayData = DayPlan.fromJson(dayJson as Map<String, dynamic>).toJson();
+      
+      dayUpdates[dayIndex] = dayData;
+    }
+    
+    // Perform partial update
+    await _remoteDatasource.updateDays(userId, planId, dayUpdates);
   }
 
   /// Forces synchronization of local plan to Firestore.

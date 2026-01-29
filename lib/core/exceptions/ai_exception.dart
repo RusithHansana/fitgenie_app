@@ -46,6 +46,7 @@ class AiException extends AppException {
       case AiErrorType.parseError:
       case AiErrorType.invalidApiKey:
       case AiErrorType.contentFiltered:
+      case AiErrorType.invalidRequest:
       case AiErrorType.unknown:
         return false;
     }
@@ -89,6 +90,9 @@ class AiException extends AppException {
 
       case AiErrorType.contentFiltered:
         return 'Unable to generate this content. Please try different parameters.';
+
+      case AiErrorType.invalidRequest:
+        return 'This type of modification is not supported. Try changing specific days or meals instead.';
 
       case AiErrorType.unknown:
         return 'Something went wrong with AI generation. Please try again.';
@@ -137,6 +141,11 @@ enum AiErrorType {
   /// The AI refused to generate content due to safety policies.
   contentFiltered,
 
+  /// Invalid or unsupported user request
+  ///
+  /// The user's modification request was rejected (e.g., full plan changes).
+  invalidRequest,
+
   /// Unknown or unhandled AI error
   unknown,
 }
@@ -157,6 +166,7 @@ extension AiErrorTypeExtension on AiErrorType {
       case AiErrorType.parseError:
       case AiErrorType.invalidApiKey:
       case AiErrorType.contentFiltered:
+      case AiErrorType.invalidRequest:
       case AiErrorType.unknown:
         return false;
     }
@@ -209,6 +219,8 @@ extension AiErrorTypeExtension on AiErrorType {
         return 'Gemini API key is invalid or missing';
       case AiErrorType.contentFiltered:
         return 'AI safety filters blocked content generation';
+      case AiErrorType.invalidRequest:
+        return 'User modification request was rejected';
       case AiErrorType.unknown:
         return 'Unhandled AI integration error';
     }
