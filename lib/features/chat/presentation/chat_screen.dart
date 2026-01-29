@@ -6,6 +6,7 @@ import 'package:fitgenie_app/features/chat/presentation/widgets/chat_bubble.dart
 import 'package:fitgenie_app/features/chat/presentation/widgets/chat_input.dart';
 import 'package:fitgenie_app/features/chat/presentation/widgets/modification_chips.dart';
 import 'package:fitgenie_app/features/chat/presentation/widgets/typing_indicator.dart';
+import 'package:fitgenie_app/routing/app_router.dart';
 import 'package:fitgenie_app/shared/widgets/error_display.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -170,6 +171,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.goToDashboard(),
+          tooltip: 'Back to Dashboard',
+        ),
         title: const Text(AppStrings.chatScreenTitle),
         actions: [
           // Clear chat history button
