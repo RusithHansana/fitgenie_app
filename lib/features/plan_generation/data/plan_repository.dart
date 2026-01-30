@@ -454,7 +454,8 @@ class PlanRepository {
     if (resultJson['modificationType'] == 'rejected') {
       throw AiException(
         AiErrorType.invalidRequest,
-        resultJson['explanation'] ?? 'Full plan modifications are not supported',
+        resultJson['explanation'] ??
+            'Full plan modifications are not supported',
       );
     }
 
@@ -477,6 +478,57 @@ class PlanRepository {
     return modifiedPlan;
   }
 
+  /// Applies pre-computed partial modifications to the current plan.
+  ///
+  /// This method is called by ChatRepository after receiving AI modifications.
+  /// It skips the AI call (already done) and directly applies the changes.
+  ///
+  /// Parameters:
+  /// - [userId]: ID of the user
+  /// - [currentPlan]: The current plan to modify
+  /// - [modificationData]: Pre-computed modification data from AI containing
+  ///   'modifiedDays' and 'modificationType'
+  ///
+  /// Throws:
+  /// - [StateError] if modification data is invalid
+  ///
+  /// Example:
+  /// ```dart
+  /// await repository.applyPartialModification(
+  ///   userId,
+  ///   currentPlan,
+  ///   {'modifiedDays': [...], 'modificationType': 'mealUpdate'},
+  /// );
+  /// ```
+  Future<WeeklyPlan> applyPartialModification(
+    String userId,
+    WeeklyPlan currentPlan,
+    Map<String, dynamic> modificationData,
+  ) async {
+    // Validate modification data
+    if (!modificationData.containsKey('modifiedDays')) {
+      throw StateError('Modification data missing modifiedDays');
+    }
+
+    // Merge changes into existing plan
+    final modifiedPlan = _mergePlanChanges(currentPlan, modificationData);
+
+    // Validate
+    modifiedPlan.validate();
+
+    // Update local cache (full plan)
+    await _localDatasource.savePlan(userId, modifiedPlan);
+
+    // Sync partial changes to remote
+    try {
+      await _syncPartialChanges(userId, currentPlan.id, modificationData);
+    } catch (e) {
+      logger.w('Failed to sync modified plan to remote', error: e);
+    }
+
+    return modifiedPlan;
+  }
+
   /// Merges partial changes from AI response into the existing plan.
   ///
   /// Creates a new WeeklyPlan with the modified days replaced.
@@ -485,31 +537,31 @@ class PlanRepository {
     Map<String, dynamic> changes,
   ) {
     final modifiedDays = changes['modifiedDays'] as List<dynamic>;
-    
+
     // Create a mutable copy of the days list
     final updatedDays = List<DayPlan>.from(currentPlan.days);
-    
+
     // Replace modified days
     for (final dayJson in modifiedDays) {
       final dayIndex = dayJson['dayIndex'] as int;
-      
+
       // Preserve existing day's id if not provided
       if (!dayJson.containsKey('id') || dayJson['id'] == null) {
         dayJson['id'] = currentPlan.days[dayIndex].id;
       }
-      
+
       // Preserve date if not provided
       if (!dayJson.containsKey('date') || dayJson['date'] == null) {
         dayJson['date'] = currentPlan.days[dayIndex].date.toIso8601String();
       }
-      
+
       // Parse the modified day
       final modifiedDay = DayPlan.fromJson(dayJson as Map<String, dynamic>);
-      
+
       // Replace in list
       updatedDays[dayIndex] = modifiedDay;
     }
-    
+
     // Create new plan with updated days
     return currentPlan.copyWith(days: updatedDays);
   }
@@ -523,19 +575,21 @@ class PlanRepository {
     Map<String, dynamic> changes,
   ) async {
     final modifiedDays = changes['modifiedDays'] as List<dynamic>;
-    
+
     // Build day updates map: dayIndex -> day data
     final dayUpdates = <int, Map<String, dynamic>>{};
-    
+
     for (final dayJson in modifiedDays) {
       final dayIndex = dayJson['dayIndex'] as int;
-      
+
       // Convert to Firestore format
-      final dayData = DayPlan.fromJson(dayJson as Map<String, dynamic>).toJson();
-      
+      final dayData = DayPlan.fromJson(
+        dayJson as Map<String, dynamic>,
+      ).toJson();
+
       dayUpdates[dayIndex] = dayData;
     }
-    
+
     // Perform partial update
     await _remoteDatasource.updateDays(userId, planId, dayUpdates);
   }

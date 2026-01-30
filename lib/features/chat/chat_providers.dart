@@ -28,6 +28,7 @@ ChatRepository chatRepository(ChatRepositoryRef ref) {
   return ChatRepository(
     firestore: ref.watch(firestoreProvider),
     geminiService: ref.watch(geminiServiceProvider),
+    planRepository: ref.watch(planRepositoryProvider),
     logger: ref.watch(loggerProvider),
   );
 }
