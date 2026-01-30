@@ -4,6 +4,7 @@ import 'package:fitgenie_app/features/plan_generation/domain/day_plan.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/exercise.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/meal.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
+import 'package:fitgenie_app/features/plan_generation/domain/workout.dart';
 import 'package:fitgenie_app/features/plan_generation/data/gemini_service.dart';
 import 'package:fitgenie_app/features/plan_generation/data/prompt_builder.dart';
 import 'package:fitgenie_app/features/plan_generation/data/plan_local_datasource.dart';
@@ -459,6 +460,13 @@ class PlanRepository {
       );
     }
 
+    // Extract affected day indices before merging
+    final modifiedDays = resultJson['modifiedDays'] as List<dynamic>;
+    final affectedDayIndices = <int>[];
+    for (final dayJson in modifiedDays) {
+      affectedDayIndices.add(dayJson['dayIndex'] as int);
+    }
+
     // Merge changes into existing plan
     final modifiedPlan = _mergePlanChanges(currentPlan, resultJson);
 
@@ -468,9 +476,14 @@ class PlanRepository {
     // Update local cache (full plan)
     await _localDatasource.savePlan(userId, modifiedPlan);
 
-    // Sync partial changes to remote
+    // Sync the merged days to remote (not the raw AI response)
     try {
-      await _syncPartialChanges(userId, currentPlan.id, resultJson);
+      await _syncMergedDays(
+        userId,
+        currentPlan.id,
+        modifiedPlan,
+        affectedDayIndices,
+      );
     } catch (e) {
       logger.w('Failed to sync modified plan', error: e);
     }
@@ -510,6 +523,13 @@ class PlanRepository {
       throw StateError('Modification data missing modifiedDays');
     }
 
+    // Extract affected day indices before merging
+    final modifiedDays = modificationData['modifiedDays'] as List<dynamic>;
+    final affectedDayIndices = <int>[];
+    for (final dayJson in modifiedDays) {
+      affectedDayIndices.add(dayJson['dayIndex'] as int);
+    }
+
     // Merge changes into existing plan
     final modifiedPlan = _mergePlanChanges(currentPlan, modificationData);
 
@@ -519,9 +539,14 @@ class PlanRepository {
     // Update local cache (full plan)
     await _localDatasource.savePlan(userId, modifiedPlan);
 
-    // Sync partial changes to remote
+    // Sync the merged days to remote (not the raw AI response)
     try {
-      await _syncPartialChanges(userId, currentPlan.id, modificationData);
+      await _syncMergedDays(
+        userId,
+        currentPlan.id,
+        modifiedPlan,
+        affectedDayIndices,
+      );
     } catch (e) {
       logger.w('Failed to sync modified plan to remote', error: e);
     }
@@ -531,66 +556,120 @@ class PlanRepository {
 
   /// Merges partial changes from AI response into the existing plan.
   ///
-  /// Creates a new WeeklyPlan with the modified days replaced.
+  /// Creates a new WeeklyPlan with smart merging at meal/workout level.
+  /// For mealUpdate: only updates specific meals, preserves others
+  /// For workoutUpdate: only updates workout, preserves meals
+  /// For dayReplacement: replaces entire day
   WeeklyPlan _mergePlanChanges(
     WeeklyPlan currentPlan,
     Map<String, dynamic> changes,
   ) {
     final modifiedDays = changes['modifiedDays'] as List<dynamic>;
+    final modificationType =
+        changes['modificationType'] as String? ?? 'dayReplacement';
 
     // Create a mutable copy of the days list
     final updatedDays = List<DayPlan>.from(currentPlan.days);
 
-    // Replace modified days
+    // Process each modified day
     for (final dayJson in modifiedDays) {
       final dayIndex = dayJson['dayIndex'] as int;
+      final existingDay = currentPlan.days[dayIndex];
 
       // Preserve existing day's id if not provided
       if (!dayJson.containsKey('id') || dayJson['id'] == null) {
-        dayJson['id'] = currentPlan.days[dayIndex].id;
+        dayJson['id'] = existingDay.id;
       }
 
       // Preserve date if not provided
       if (!dayJson.containsKey('date') || dayJson['date'] == null) {
-        dayJson['date'] = currentPlan.days[dayIndex].date.toIso8601String();
+        dayJson['date'] = existingDay.date.toIso8601String();
       }
 
-      // Parse the modified day
-      final modifiedDay = DayPlan.fromJson(dayJson as Map<String, dynamic>);
+      DayPlan mergedDay;
 
-      // Replace in list
-      updatedDays[dayIndex] = modifiedDay;
+      if (modificationType == 'mealUpdate') {
+        // Merge meals: only update specific meals that are in the response
+        mergedDay = _mergeMeals(existingDay, dayJson as Map<String, dynamic>);
+      } else if (modificationType == 'workoutUpdate') {
+        // Merge workout: update workout, preserve meals
+        mergedDay = _mergeWorkout(existingDay, dayJson as Map<String, dynamic>);
+      } else {
+        // dayReplacement: replace entire day
+        mergedDay = DayPlan.fromJson(dayJson as Map<String, dynamic>);
+      }
+
+      updatedDays[dayIndex] = mergedDay;
     }
 
     // Create new plan with updated days
     return currentPlan.copyWith(days: updatedDays);
   }
 
-  /// Syncs partial changes to Firestore using field paths.
+  /// Merges only the meals from the AI response into the existing day.
   ///
-  /// Only updates the specific days that were modified, not the entire plan.
-  Future<void> _syncPartialChanges(
-    String userId,
-    String planId,
-    Map<String, dynamic> changes,
-  ) async {
-    final modifiedDays = changes['modifiedDays'] as List<dynamic>;
+  /// Matches meals by type (breakfast, lunch, dinner, snack) and only
+  /// updates those that are explicitly provided in the response.
+  DayPlan _mergeMeals(DayPlan existingDay, Map<String, dynamic> dayJson) {
+    final updatedMeals = List<Meal>.from(existingDay.meals);
+    final newMealsJson = dayJson['meals'] as List<dynamic>?;
 
-    // Build day updates map: dayIndex -> day data
-    final dayUpdates = <int, Map<String, dynamic>>{};
+    if (newMealsJson != null && newMealsJson.isNotEmpty) {
+      for (final mealJson in newMealsJson) {
+        final mealMap = mealJson as Map<String, dynamic>;
+        final newMeal = Meal.fromJson(mealMap);
 
-    for (final dayJson in modifiedDays) {
-      final dayIndex = dayJson['dayIndex'] as int;
+        // Find the existing meal of the same type and replace it
+        final existingIndex = updatedMeals.indexWhere(
+          (m) => m.type == newMeal.type,
+        );
 
-      // Convert to Firestore format
-      final dayData = DayPlan.fromJson(
-        dayJson as Map<String, dynamic>,
-      ).toJson();
-
-      dayUpdates[dayIndex] = dayData;
+        if (existingIndex >= 0) {
+          // Replace the existing meal of the same type
+          updatedMeals[existingIndex] = newMeal;
+        } else {
+          // Add as new meal if no matching type found
+          updatedMeals.add(newMeal);
+        }
+      }
     }
 
-    // Perform partial update
+    return existingDay.copyWith(meals: updatedMeals);
+  }
+
+  /// Merges only the workout from the AI response into the existing day.
+  ///
+  /// Updates the workout while preserving the existing meals.
+  DayPlan _mergeWorkout(DayPlan existingDay, Map<String, dynamic> dayJson) {
+    final workoutJson = dayJson['workout'] as Map<String, dynamic>?;
+
+    if (workoutJson != null) {
+      final newWorkout = Workout.fromJson(workoutJson);
+      return existingDay.copyWith(workout: newWorkout);
+    }
+
+    return existingDay;
+  }
+
+  /// Syncs the merged days to Firestore.
+  ///
+  /// This method syncs the complete merged day data, ensuring that
+  /// Firestore gets the full day with all meals/workouts preserved.
+  Future<void> _syncMergedDays(
+    String userId,
+    String planId,
+    WeeklyPlan modifiedPlan,
+    List<int> affectedDayIndices,
+  ) async {
+    // Build day updates map: dayIndex -> complete day data
+    final dayUpdates = <int, Map<String, dynamic>>{};
+
+    for (final dayIndex in affectedDayIndices) {
+      final mergedDay = modifiedPlan.days[dayIndex];
+      dayUpdates[dayIndex] = mergedDay.toJson();
+    }
+
+    // Perform partial update with complete merged day data
     await _remoteDatasource.updateDays(userId, planId, dayUpdates);
   }
 
