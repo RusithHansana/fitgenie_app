@@ -321,7 +321,7 @@ class _MealTypeBadge extends StatelessWidget {
       case MealType.dinner:
         return context.colorScheme.tertiaryContainer;
       case MealType.snack:
-        return context.colorScheme.surfaceContainerHighest;
+        return context.colorScheme.surfaceContainer;
     }
   }
 
