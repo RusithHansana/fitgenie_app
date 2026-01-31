@@ -85,9 +85,7 @@ class _ExerciseTileState extends State<ExerciseTile> {
       margin: const EdgeInsets.only(bottom: AppSizes.spacingSm),
       padding: const EdgeInsets.all(AppSizes.spacingMd),
       decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.3,
-        ),
+        color: context.colorScheme.surfaceContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         border: Border.all(
           color: context.colorScheme.outlineVariant.withValues(alpha: 0.3),
