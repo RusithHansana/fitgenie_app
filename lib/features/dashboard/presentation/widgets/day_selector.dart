@@ -278,7 +278,7 @@ class _DayButton extends ConsumerWidget {
     if (isComplete) {
       return context.colorScheme.tertiaryContainer;
     }
-    return context.colorScheme.surfaceContainerHighest;
+    return context.colorScheme.surfaceContainer;
   }
 
   /// Gets text color based on state.
