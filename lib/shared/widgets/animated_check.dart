@@ -121,7 +121,19 @@ class _AnimatedCheckState extends State<AnimatedCheck> {
         ? AppColors.success
         : context.colorScheme.outline;
 
-    return Icon(icon, size: widget.size, color: color)
+    final backgroundColor = context.colorScheme.onPrimary;
+    final backgroundSize = widget.size + 8;
+
+    return Container(
+          width: backgroundSize,
+          height: backgroundSize,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, size: widget.size, color: color),
+        )
         // Apply scale animation when completing
         .animate(target: widget.isComplete ? 1 : 0)
         .scale(
