@@ -60,6 +60,10 @@ class ProfileScreen extends ConsumerWidget {
                 floating: true,
                 backgroundColor: context.colorScheme.primaryContainer,
                 foregroundColor: context.colorScheme.onPrimaryContainer,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.goToDashboard(),
+                ),
               ),
 
               // Profile content
@@ -133,10 +137,10 @@ class ProfileScreen extends ConsumerWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceAround,
                                   children: [
-                                    _buildStatSkeleton(),
-                                    _buildStatSkeleton(),
-                                    _buildStatSkeleton(),
-                                    _buildStatSkeleton(),
+                                    Expanded(child: _buildStatSkeleton()),
+                                    Expanded(child: _buildStatSkeleton()),
+                                    Expanded(child: _buildStatSkeleton()),
+                                    Expanded(child: _buildStatSkeleton()),
                                   ],
                                 ),
                               ],
