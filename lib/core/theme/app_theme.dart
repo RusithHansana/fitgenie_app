@@ -525,7 +525,9 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         ),
-        labelStyle: AppTextStyles.textTheme.labelLarge,
+        labelStyle: AppTextStyles.textTheme.labelLarge?.copyWith(
+          color: colorScheme.onSurface,
+        ),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSizes.spacingMd,
           vertical: AppSizes.spacingSm,
