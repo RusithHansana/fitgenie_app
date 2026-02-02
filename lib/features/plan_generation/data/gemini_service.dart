@@ -2,6 +2,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:logger/logger.dart';
 import 'package:fitgenie_app/core/config/app_config.dart';
 import 'package:fitgenie_app/core/constants/ai_constants.dart';
+import 'package:fitgenie_app/core/constants/rate_limit_config.dart';
 import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
 import 'package:fitgenie_app/core/utils/json_parser.dart';
 import 'package:fitgenie_app/core/utils/retry_helper.dart';
@@ -17,6 +18,9 @@ enum PlanResponseType {
 
   /// Outline-only response for weekly structure.
   outline,
+
+  /// Partial modification response (changed days only).
+  partialModification,
 }
 
 /// Service for interacting with Google Gemini AI API.
@@ -80,11 +84,8 @@ class GeminiService {
   /// Whether the model has been initialized.
   bool _isInitialized = false;
 
-  /// Rate limiter to keep Gemini requests under 5 RPM.
-  static final RateLimiter _rateLimiter = RateLimiter(
-    maxRequests: 4,
-    window: const Duration(minutes: 1),
-  );
+  /// Rate limiter singleton instance.
+  static final RateLimiter _rateLimiter = RateLimiter();
 
   /// Initializes the Gemini model with configuration.
   ///
@@ -220,12 +221,50 @@ class GeminiService {
   /// final modifiedJson = await service.modifyPlan(modPrompt);
   /// final updatedPlan = WeeklyPlan.fromJson(modifiedJson);
   /// ```
+  @Deprecated('Use modifyPlanPartial instead for partial modifications')
   Future<Map<String, dynamic>> modifyPlan(String prompt) async {
     return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
       () => _executeGeneration(prompt, responseType: PlanResponseType.fullPlan),
       onRetry: (attempt, delay, error) {
         logger.w(
           'Gemini modification retry $attempt after ${delay}s: ${error.toString()}',
+        );
+      },
+    );
+  }
+
+  /// Modifies an existing plan with partial updates.
+  ///
+  /// Returns only the modified days/items, not the full plan.
+  /// The repository will merge these changes with the existing plan.
+  ///
+  /// Parameters:
+  /// - [prompt]: Partial modification prompt from PromptBuilder
+  ///
+  /// Returns: Parsed JSON Map with modification result containing:
+  /// - modificationType: dayReplacement, workoutUpdate, mealUpdate, rejected
+  /// - modifiedDays: Array of changed days only
+  /// - explanation: AI's description of changes
+  ///
+  /// Throws:
+  /// - [AiException] with appropriate error type for all failures
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = await service.modifyPlanPartial(prompt);
+  /// if (result['modificationType'] == 'rejected') {
+  ///   throw AiException(AiErrorType.invalidRequest, result['explanation']);
+  /// }
+  /// ```
+  Future<Map<String, dynamic>> modifyPlanPartial(String prompt) async {
+    return await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
+      () => _executeGeneration(
+        prompt,
+        responseType: PlanResponseType.partialModification,
+      ),
+      onRetry: (attempt, delay, error) {
+        logger.w(
+          'Gemini partial modification retry $attempt after ${delay}s: ${error.toString()}',
         );
       },
     );
@@ -246,10 +285,38 @@ class GeminiService {
       );
     }
 
-    try {
-      // Enforce request rate limiting
-      await _rateLimiter.acquire();
+    // Estimate tokens for the prompt
+    final estimatedTokens = RateLimitConfig.estimateTokens(prompt);
 
+    // Pre-check rate limits before making request
+    final limitCheck = _rateLimiter.canMakeRequest(
+      estimatedTokens: estimatedTokens,
+    );
+
+    if (limitCheck != RateLimitExceeded.none) {
+      logger.w('Rate limit would be exceeded: $limitCheck');
+      switch (limitCheck) {
+        case RateLimitExceeded.rpm:
+          throw const AiException(
+            AiErrorType.localRpmExceeded,
+            'Requests per minute limit reached',
+          );
+        case RateLimitExceeded.rpd:
+          throw const AiException(
+            AiErrorType.localRpdExceeded,
+            'Daily request limit reached',
+          );
+        case RateLimitExceeded.tokens:
+          throw const AiException(
+            AiErrorType.localTokensExceeded,
+            'Daily token limit reached',
+          );
+        case RateLimitExceeded.none:
+          break; // Should not happen
+      }
+    }
+
+    try {
       // Generate content with timeout
       final response = await _model
           .generateContent([Content.text(prompt)])
@@ -295,7 +362,18 @@ class GeminiService {
           case PlanResponseType.outline:
             _validateOutlineJson(jsonMap);
             break;
+          case PlanResponseType.partialModification:
+            _validatePartialModificationJson(jsonMap);
+            break;
         }
+
+        // Record successful request with token usage
+        await _rateLimiter.recordRequest(tokensUsed: estimatedTokens);
+        logger.d(
+          'Request recorded: ~$estimatedTokens tokens, '
+          'daily: ${_rateLimiter.dailyRequestCount}/${RateLimitConfig.effectiveRpd} requests, '
+          '${_rateLimiter.dailyTokensUsed}/${RateLimitConfig.effectiveMaxTokens} tokens',
+        );
 
         return jsonMap;
       } on AiException {
@@ -465,6 +543,105 @@ class GeminiService {
     }
   }
 
+  /// Validates that the partial modification JSON has required fields.
+  ///
+  /// Checks for:
+  /// - 'modificationType' field exists and is valid
+  /// - 'modifiedDays' field exists (can be empty for rejected)
+  /// - 'explanation' field exists
+  /// - each modified day has valid dayIndex (0-6)
+  void _validatePartialModificationJson(Map<String, dynamic> json) {
+    // Check for required modificationType field
+    if (!json.containsKey('modificationType')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Modification response missing required field: modificationType',
+      );
+    }
+
+    final modificationType = json['modificationType'];
+    final validTypes = [
+      'dayReplacement',
+      'workoutUpdate',
+      'mealUpdate',
+      'rejected',
+    ];
+    if (!validTypes.contains(modificationType)) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'Invalid modificationType: $modificationType. Must be one of: $validTypes',
+      );
+    }
+
+    // Check for explanation field
+    if (!json.containsKey('explanation')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Modification response missing required field: explanation',
+      );
+    }
+
+    // For rejected modifications, modifiedDays can be empty
+    if (modificationType == 'rejected') {
+      return;
+    }
+
+    // For accepted modifications, validate modifiedDays
+    if (!json.containsKey('modifiedDays')) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'Modification response missing required field: modifiedDays',
+      );
+    }
+
+    final modifiedDays = json['modifiedDays'];
+    if (modifiedDays is! List) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'modifiedDays must be a list, got ${modifiedDays.runtimeType}',
+      );
+    }
+
+    if (modifiedDays.isEmpty) {
+      throw const AiException(
+        AiErrorType.invalidResponse,
+        'modifiedDays must contain at least one day for non-rejected modifications',
+      );
+    }
+
+    if (modifiedDays.length > 7) {
+      throw AiException(
+        AiErrorType.invalidResponse,
+        'modifiedDays cannot exceed 7 days, got ${modifiedDays.length}',
+      );
+    }
+
+    // Validate each modified day
+    for (final day in modifiedDays) {
+      if (day is! Map<String, dynamic>) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each modified day must be a JSON object',
+        );
+      }
+
+      if (!day.containsKey('dayIndex')) {
+        throw const AiException(
+          AiErrorType.invalidResponse,
+          'Each modified day must include dayIndex',
+        );
+      }
+
+      final dayIndex = day['dayIndex'];
+      if (dayIndex is! int || dayIndex < 0 || dayIndex > 6) {
+        throw AiException(
+          AiErrorType.invalidResponse,
+          'dayIndex must be an integer 0-6, got $dayIndex',
+        );
+      }
+    }
+  }
+
   /// Transforms Gemini API exceptions to typed AiExceptions.
   ///
   /// Maps various Gemini error conditions to appropriate AiErrorType:
@@ -545,10 +722,38 @@ class GeminiService {
       );
     }
 
-    try {
-      // Enforce request rate limiting
-      await _rateLimiter.acquire();
+    // Estimate tokens for the message
+    final estimatedTokens = RateLimitConfig.estimateTokens(message);
 
+    // Pre-check rate limits before making request
+    final limitCheck = _rateLimiter.canMakeRequest(
+      estimatedTokens: estimatedTokens,
+    );
+
+    if (limitCheck != RateLimitExceeded.none) {
+      logger.w('Rate limit would be exceeded: $limitCheck');
+      switch (limitCheck) {
+        case RateLimitExceeded.rpm:
+          throw const AiException(
+            AiErrorType.localRpmExceeded,
+            'Requests per minute limit reached',
+          );
+        case RateLimitExceeded.rpd:
+          throw const AiException(
+            AiErrorType.localRpdExceeded,
+            'Daily request limit reached',
+          );
+        case RateLimitExceeded.tokens:
+          throw const AiException(
+            AiErrorType.localTokensExceeded,
+            'Daily token limit reached',
+          );
+        case RateLimitExceeded.none:
+          break; // Should not happen
+      }
+    }
+
+    try {
       final response = await _model
           .generateContent([Content.text(message)])
           .timeout(
@@ -568,6 +773,9 @@ class GeminiService {
           'Empty response from Gemini',
         );
       }
+
+      // Record successful request with token usage
+      await _rateLimiter.recordRequest(tokensUsed: estimatedTokens);
 
       return text.trim();
     } on AiException {

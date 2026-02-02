@@ -210,7 +210,7 @@ class _StreakBadgeState extends State<StreakBadge>
         vertical: dimensions.verticalPadding,
       ),
       decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest,
+        color: context.colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(AppSizes.radiusFull),
         border: Border.all(color: context.colorScheme.outlineVariant, width: 1),
       ),

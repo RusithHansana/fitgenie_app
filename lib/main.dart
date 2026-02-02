@@ -2,6 +2,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:fitgenie_app/core/config/environment.dart';
 import 'package:fitgenie_app/core/theme/app_theme.dart';
+import 'package:fitgenie_app/core/utils/rate_limiter.dart';
 import 'package:fitgenie_app/firebase_options.dart';
 import 'package:fitgenie_app/routing/app_router.dart';
 import 'package:fitgenie_app/shared/services/hive_service.dart';
@@ -49,6 +50,10 @@ void main() async {
   // Initialize Hive for local storage
   // Opens all required boxes for offline-first functionality
   await HiveService.initialize();
+
+  // Initialize rate limiter for API request management
+  // Loads persisted daily request counts from Hive
+  await RateLimiter().initialize();
 
   // Configure system UI overlay style
   // Makes status bar transparent with dark icons for light theme

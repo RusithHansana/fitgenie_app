@@ -364,6 +364,87 @@ class PlanRemoteDatasource {
     }
   }
 
+  /// Updates specific days in a plan using Firestore field paths.
+  ///
+  /// This method performs partial updates on the plan document,
+  /// only modifying the days that were changed rather than replacing
+  /// the entire plan.
+  ///
+  /// Parameters:
+  /// - [userId]: ID of the user who owns the plan
+  /// - [planId]: ID of the plan to update
+  /// - [dayUpdates]: Map of dayIndex -> day data for days to update
+  ///
+  /// Throws:
+  /// - [NetworkException] for connectivity/Firestore errors
+  /// - [SyncException] for permission or data sync errors
+  ///
+  /// Example:
+  /// ```dart
+  /// await datasource.updateDays('user_123', 'plan_456', {
+  ///   0: {'dayIndex': 0, 'workout': {...}, 'meals': [...]},
+  ///   2: {'dayIndex': 2, 'workout': {...}, 'meals': [...]},
+  /// });
+  /// ```
+  Future<void> updateDays(
+    String userId,
+    String planId,
+    Map<int, Map<String, dynamic>> dayUpdates,
+  ) async {
+    try {
+      final planRef = _getPlanDocument(userId, planId);
+
+      // Build field path updates for each day
+      final updates = <String, dynamic>{};
+
+      for (final entry in dayUpdates.entries) {
+        // Use field path notation to update specific day
+        updates['days.${entry.key}'] = entry.value;
+      }
+
+      // Add updatedAt timestamp
+      updates['updatedAt'] = FieldValue.serverTimestamp();
+
+      await planRef.update(updates);
+    } on FirebaseException catch (e) {
+      if (e.code == 'unavailable') {
+        throw NetworkException(
+          NetworkErrorType.noConnection,
+          'Firestore unavailable: ${e.message}',
+        );
+      } else if (e.code == 'permission-denied') {
+        throw SyncException(
+          SyncErrorType.permissionDenied,
+          'Permission denied updating plan: ${e.message}',
+        );
+      } else if (e.code == 'not-found') {
+        throw NetworkException(
+          NetworkErrorType.notFound,
+          'Plan not found: ${e.message}',
+        );
+      }
+      throw NetworkException(
+        NetworkErrorType.serverError,
+        'Firestore error updating days: ${e.message}',
+      );
+    } on SocketException catch (e) {
+      throw NetworkException(
+        NetworkErrorType.noConnection,
+        'No internet connection: ${e.message}',
+      );
+    } on TimeoutException {
+      throw const NetworkException(
+        NetworkErrorType.timeout,
+        'Request timed out while updating plan days',
+      );
+    } catch (e) {
+      throw SyncException(
+        SyncErrorType.syncFailed,
+        'Failed to update plan days in Firestore: $e',
+      );
+    }
+  }
+
   /// Archives a plan by setting isActive to false.
   ///
   /// Archived plans remain in Firestore for history but are not

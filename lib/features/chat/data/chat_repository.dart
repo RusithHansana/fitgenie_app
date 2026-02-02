@@ -6,6 +6,7 @@ import 'package:fitgenie_app/features/chat/domain/chat_message.dart';
 import 'package:logger/logger.dart';
 import 'package:fitgenie_app/features/chat/domain/modification_request.dart';
 import 'package:fitgenie_app/features/plan_generation/data/gemini_service.dart';
+import 'package:fitgenie_app/features/plan_generation/data/plan_repository.dart';
 import 'package:fitgenie_app/features/plan_generation/data/prompt_builder.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
 import 'package:uuid/uuid.dart';
@@ -80,6 +81,9 @@ class ChatRepository {
   /// Gemini AI service for processing modifications.
   final GeminiService geminiService;
 
+  /// Plan repository for applying modifications.
+  final PlanRepository planRepository;
+
   /// Logger instance for tracking operations and errors.
   final Logger logger;
 
@@ -91,10 +95,12 @@ class ChatRepository {
   /// Parameters:
   /// - [firestore]: FirebaseFirestore instance for persistence
   /// - [geminiService]: GeminiService for AI calls
+  /// - [planRepository]: PlanRepository for applying plan modifications
   /// - [logger]: Logger instance for tracking operations
   ChatRepository({
     required this.firestore,
     required this.geminiService,
+    required this.planRepository,
     required this.logger,
   });
 
@@ -281,8 +287,8 @@ class ChatRepository {
     required ModificationRequest request,
     required WeeklyPlan currentPlan,
   }) async {
-    // Build modification prompt
-    final prompt = PromptBuilder.buildModificationPrompt(
+    // Build partial modification prompt
+    final prompt = PromptBuilder.buildPartialModificationPrompt(
       currentPlan,
       request.userRequest,
     );
@@ -290,7 +296,7 @@ class ChatRepository {
     // Call AI with retry logic
     final modifiedPlanData =
         await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
-          () => geminiService.modifyPlan(prompt),
+          () => geminiService.modifyPlanPartial(prompt),
           onRetry: (attempt, delay, error) {
             logger.w(
               'Retry modification attempt $attempt after ${delay}s: ${error.toString()}',
@@ -428,22 +434,28 @@ class ChatRepository {
     );
   }
 
-  /// Handles a modification request through AI.
+  /// Handles a modification request through AI using partial updates.
+  ///
+  /// This method:
+  /// 1. Builds a modification prompt with current plan context
+  /// 2. Calls Gemini AI to process the modification
+  /// 3. Applies the modification to the plan via PlanRepository
+  /// 4. Returns a confirmation message
   Future<ChatMessage> _handleModificationRequest({
     required String userId,
     required ChatMessage userMessage,
     required WeeklyPlan currentPlan,
   }) async {
-    // Build modification prompt
-    final prompt = PromptBuilder.buildModificationPrompt(
+    // Build partial modification prompt
+    final prompt = PromptBuilder.buildPartialModificationPrompt(
       currentPlan,
       userMessage.content,
     );
 
-    // Call AI with retry logic
+    // Call AI with retry logic for partial modification
     final modifiedPlanData =
         await RetryHelper.retryGeminiCall<Map<String, dynamic>>(
-          () => geminiService.modifyPlan(prompt),
+          () => geminiService.modifyPlanPartial(prompt),
           onRetry: (attempt, delay, error) {
             logger.w(
               'Modification retry $attempt after ${delay}s: ${error.toString()}',
@@ -451,15 +463,49 @@ class ChatRepository {
           },
         );
 
-    // Create confirmation message
-    final responseContent = _buildModificationConfirmation(
-      userMessage.content,
-      modifiedPlanData,
-    );
+    // Check for rejection
+    if (modifiedPlanData['modificationType'] == 'rejected') {
+      final explanation =
+          modifiedPlanData['explanation'] as String? ??
+          'This type of modification is not supported.';
+      return ChatMessage(
+        id: _uuid.v4(),
+        content: explanation,
+        role: MessageRole.assistant,
+        timestamp: DateTime.now(),
+        isModificationRequest: true,
+        modificationApplied: false,
+      );
+    }
+
+    // Apply the modification to the plan
+    try {
+      await planRepository.applyPartialModification(
+        userId,
+        currentPlan,
+        modifiedPlanData,
+      );
+    } catch (e) {
+      logger.e('Failed to apply plan modification', error: e);
+      return ChatMessage(
+        id: _uuid.v4(),
+        content:
+            'I understood your request but failed to save the changes. Please try again.',
+        role: MessageRole.assistant,
+        timestamp: DateTime.now(),
+        isModificationRequest: true,
+        modificationApplied: false,
+      );
+    }
+
+    // Create confirmation message with AI's explanation
+    final explanation =
+        modifiedPlanData['explanation'] as String? ??
+        AppStrings.chatModificationConfirmation;
 
     return ChatMessage(
       id: _uuid.v4(),
-      content: responseContent,
+      content: explanation,
       role: MessageRole.assistant,
       timestamp: DateTime.now(),
       isModificationRequest: true,
@@ -501,15 +547,6 @@ class ChatRepository {
       isModificationRequest: false,
       modificationApplied: false,
     );
-  }
-
-  /// Builds a user-friendly modification confirmation message.
-  String _buildModificationConfirmation(
-    String userRequest,
-    Map<String, dynamic> modifiedData,
-  ) {
-    // Default confirmation
-    return AppStrings.chatModificationConfirmation;
   }
 
   /// Gets a user-friendly error message from an exception.

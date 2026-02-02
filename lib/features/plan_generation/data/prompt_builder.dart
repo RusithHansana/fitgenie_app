@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:fitgenie_app/features/onboarding/domain/user_profile.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
+import 'package:fitgenie_app/features/plan_generation/domain/workout.dart';
 import 'package:fitgenie_app/core/constants/dietary_options.dart';
 
 import '../../../core/utils/formatters.dart';
@@ -352,25 +353,144 @@ Generate this batch now:
 ''';
   }
 
-  /// Builds a prompt for modifying an existing plan.
+  /// Builds a prompt for partial plan modifications.
   ///
-  /// Creates a prompt that includes the current plan context and the user's
-  /// modification request. The AI should preserve the overall structure while
-  /// making the requested changes.
+  /// Creates a prompt that instructs the AI to return ONLY the modified
+  /// days/items, not the full plan. Full plan changes are rejected.
   ///
   /// Parameters:
   /// - [currentPlan]: The existing WeeklyPlan to be modified
   /// - [modificationRequest]: User's natural language modification request
   ///
-  /// Returns: Complete modification prompt string
+  /// Returns: Partial modification prompt string
   ///
   /// Example:
   /// ```dart
-  /// final prompt = PromptBuilder.buildModificationPrompt(
+  /// final prompt = PromptBuilder.buildPartialModificationPrompt(
   ///   weeklyPlan,
-  ///   'Make all meals vegetarian and swap Tuesday workout for cardio',
+  ///   'Make Tuesday lunch vegetarian',
   /// );
   /// ```
+  static String buildPartialModificationPrompt(
+    WeeklyPlan currentPlan,
+    String modificationRequest,
+  ) {
+    return '''
+You are FitGenie, an expert AI personal trainer and nutritionist. A user wants to make a TARGETED modification to their existing fitness plan.
+
+=== CURRENT PLAN SUMMARY ===
+Plan ID: ${currentPlan.id}
+Week: ${currentPlan.dateRangeDisplay}
+
+${_summarizePlanDetailed(currentPlan)}
+
+=== USER'S MODIFICATION REQUEST ===
+"$modificationRequest"
+
+=== CRITICAL RULES ===
+1. ONLY modify the specific days/items requested
+2. Return ONLY the modified days, NOT the entire plan
+3. REJECT requests that would change more than 3 days or the entire plan
+4. Preserve equipment constraints: ${_formatEquipmentFromSnapshot(currentPlan.profileSnapshot)}
+5. Respect dietary restrictions: ${_formatDietaryFromSnapshot(currentPlan.profileSnapshot)}
+
+=== REJECTION CRITERIA ===
+You MUST return modificationType: "rejected" for these requests:
+- "Give me a new plan" or "regenerate my plan"
+- "Change everything" or "modify the whole week"
+- Any request affecting more than 3 days
+- Requests that are too vague to identify specific changes
+
+=== REQUIRED OUTPUT FORMAT ===
+Respond with ONLY valid JSON matching this schema.
+Output must be minified JSON with no extra whitespace, line breaks, or indentation.
+
+{
+  "modificationType": "dayReplacement|workoutUpdate|mealUpdate|rejected",
+  "modifiedDays": [
+    {
+      "id": "existing-day-id",
+      "dayIndex": 0,
+      "date": "2026-01-20T00:00:00.000Z",
+      "workout": {
+        "id": "workout-id",
+        "name": "Updated Workout Name",
+        "type": "strength|cardio|flexibility|rest",
+        "durationMinutes": 45,
+        "exercises": [
+          {
+            "id": "unique-exercise-id",
+            "name": "Exercise Name",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 90,
+            "notes": "Form cues and tips",
+            "equipmentRequired": ["dumbbells"],
+            "isComplete": false
+          }
+        ]
+      },
+      "meals": [
+        {
+          "id": "meal-id",
+          "name": "Updated Meal Name",
+          "type": "breakfast|lunch|dinner|snack",
+          "calories": 500,
+          "protein": 30,
+          "carbs": 50,
+          "fat": 15,
+          "ingredients": ["1 cup ingredient"],
+          "instructions": "Brief preparation steps",
+          "dietaryInfo": ["Vegetarian"],
+          "isComplete": false
+        }
+      ]
+    }
+  ],
+  "explanation": "Changed Tuesday's lunch to a vegetarian stir-fry"
+}
+
+=== EXERCISE FIELD REQUIREMENTS ===
+CRITICAL: Each exercise MUST include these fields with exact names and types:
+- "id": String (unique identifier)
+- "name": String (exercise name)
+- "sets": Integer (number of sets, use 1 for time-based exercises)
+- "reps": String (rep count or duration, e.g., "10-12" or "30 seconds")
+- "restSeconds": Integer (rest between sets in seconds, use 60 as default)
+- "notes": String or null (form cues)
+- "equipmentRequired": Array of strings (e.g., ["dumbbells"] or ["bodyweight"])
+- "isComplete": false
+
+DO NOT use these wrong field names:
+- "equipment" → use "equipmentRequired"
+- "instructions" → use "notes"
+- "weight" → not needed
+- "durationMinutes" → not needed for exercises
+
+=== MODIFICATION TYPES ===
+- dayReplacement: Entire day(s) are being replaced (workout + meals)
+- workoutUpdate: Only workout portion of day(s) is changing
+- mealUpdate: Only specific meal(s) within day(s) are changing
+- rejected: Request cannot be fulfilled (too broad or invalid)
+
+=== NOTES ===
+- For mealUpdate: only include the changed meals in the meals array
+- For workoutUpdate: only include NEWLY ADDED exercises in the exercises array
+  * Do NOT include existing exercises in the response
+  * Do NOT summarize or condense existing exercises
+  * The app will automatically merge new exercises with existing ones
+- Preserve existing IDs when updating items (don't generate new IDs for existing items)
+- Generate new unique IDs for newly added exercises/meals
+- Set isComplete to false for any new/modified exercises or meals
+
+Generate the partial modification response now:
+''';
+  }
+
+  /// Builds the old full plan modification prompt.
+  ///
+  /// @deprecated Use [buildPartialModificationPrompt] instead.
+  @Deprecated('Use buildPartialModificationPrompt for partial updates')
   static String buildModificationPrompt(
     WeeklyPlan currentPlan,
     String modificationRequest,
@@ -454,6 +574,71 @@ Generate the modified plan now:
     }
 
     return buffer.toString();
+  }
+
+  /// Creates a detailed summary for partial modification context.
+  ///
+  /// Includes meal names and workout details for better AI context.
+  static String _summarizePlanDetailed(WeeklyPlan plan) {
+    final buffer = StringBuffer();
+
+    for (final day in plan.days) {
+      buffer.writeln('${day.dayName} (dayIndex: ${day.dayIndex}):');
+
+      // Workout info
+      if (day.workout != null && day.workout!.type != WorkoutType.rest) {
+        buffer.writeln(
+          '  Workout: ${day.workout!.name} (${day.workout!.type.name}, ${day.workout!.durationMinutes}min)',
+        );
+      } else {
+        buffer.writeln('  Workout: Rest Day');
+      }
+
+      // Meals summary
+      for (final meal in day.meals) {
+        buffer.writeln(
+          '  ${meal.type.name}: ${meal.name} (${meal.calories} cal)',
+        );
+      }
+
+      buffer.writeln();
+    }
+
+    return buffer.toString();
+  }
+
+  /// Extracts equipment info from profile snapshot for modification prompts.
+  static String _formatEquipmentFromSnapshot(Map<String, dynamic> snapshot) {
+    final equipment = snapshot['equipment'] as String?;
+    final equipmentDetails = snapshot['equipmentDetails'] as List<dynamic>?;
+
+    if (equipment == null || equipment == 'bodyweight') {
+      return 'Bodyweight only (no equipment)';
+    }
+
+    if (equipmentDetails != null && equipmentDetails.isNotEmpty) {
+      return '$equipment: ${equipmentDetails.join(', ')}';
+    }
+
+    return equipment;
+  }
+
+  /// Extracts dietary restrictions from profile snapshot for modification prompts.
+  static String _formatDietaryFromSnapshot(Map<String, dynamic> snapshot) {
+    final restrictions = snapshot['dietaryRestrictions'] as List<dynamic>?;
+    final notes = snapshot['dietaryNotes'] as String?;
+
+    if (restrictions == null || restrictions.isEmpty) {
+      return 'No restrictions';
+    }
+
+    final restrictionsText = restrictions.join(', ');
+
+    if (notes != null && notes.isNotEmpty) {
+      return '$restrictionsText (Note: $notes)';
+    }
+
+    return restrictionsText;
   }
 
   /// Builds a simplified prompt for chat-based quick modifications.

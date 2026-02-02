@@ -4,6 +4,7 @@ import 'package:fitgenie_app/features/plan_generation/domain/day_plan.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/exercise.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/meal.dart';
 import 'package:fitgenie_app/features/plan_generation/domain/weekly_plan.dart';
+import 'package:fitgenie_app/features/plan_generation/domain/workout.dart';
 import 'package:fitgenie_app/features/plan_generation/data/gemini_service.dart';
 import 'package:fitgenie_app/features/plan_generation/data/prompt_builder.dart';
 import 'package:fitgenie_app/features/plan_generation/data/plan_local_datasource.dart';
@@ -409,26 +410,26 @@ class PlanRepository {
     return updatedPlan;
   }
 
-  /// Modifies the current plan based on user request.
+  /// Modifies the current plan based on user request using partial updates.
   ///
-  /// Uses Gemini AI to interpret the modification request and
-  /// regenerate the affected portions of the plan.
+  /// Uses Gemini AI to interpret the modification request and returns
+  /// only the modified days/items, which are merged into the existing plan.
   ///
   /// Parameters:
   /// - [userId]: ID of the user
   /// - [modificationRequest]: Natural language modification request
   ///
-  /// Returns: Modified WeeklyPlan
+  /// Returns: Modified WeeklyPlan with merged changes
   ///
   /// Throws:
-  /// - [AiException] if modification fails
+  /// - [AiException] if modification fails or is rejected
   /// - [StateError] if no current plan exists
   ///
   /// Example:
   /// ```dart
   /// final modified = await repository.modifyPlan(
   ///   userId,
-  ///   'Make all Tuesday meals vegetarian',
+  ///   'Make Tuesday lunch vegetarian',
   /// );
   /// ```
   Future<WeeklyPlan> modifyPlan(
@@ -441,39 +442,294 @@ class PlanRepository {
       throw StateError('No current plan to modify');
     }
 
-    // Build modification prompt
-    final prompt = PromptBuilder.buildModificationPrompt(
+    // Build partial modification prompt
+    final prompt = PromptBuilder.buildPartialModificationPrompt(
       currentPlan,
       modificationRequest,
     );
 
-    // Get modified plan from AI
-    final modifiedJson = await _geminiService.modifyPlan(prompt);
+    // Get partial modification from AI
+    final resultJson = await _geminiService.modifyPlanPartial(prompt);
 
-    // Preserve metadata from current plan
-    modifiedJson['id'] = currentPlan.id;
-    modifiedJson['userId'] = currentPlan.userId;
-    modifiedJson['createdAt'] = currentPlan.createdAt.toIso8601String();
-    modifiedJson['startDate'] = currentPlan.startDate.toIso8601String();
-    modifiedJson['profileSnapshot'] = currentPlan.profileSnapshot;
+    // Check for rejection
+    if (resultJson['modificationType'] == 'rejected') {
+      throw AiException(
+        AiErrorType.invalidRequest,
+        resultJson['explanation'] ??
+            'Full plan modifications are not supported',
+      );
+    }
 
-    // Parse modified plan
-    final modifiedPlan = WeeklyPlan.fromJson(modifiedJson);
+    // Sanitize the AI response to handle type mismatches and wrong field names
+    final sanitizedResult = _sanitizeModificationResponse(resultJson);
+
+    // Extract affected day indices before merging
+    final modifiedDays = sanitizedResult['modifiedDays'] as List<dynamic>;
+    final affectedDayIndices = <int>[];
+    for (final dayJson in modifiedDays) {
+      affectedDayIndices.add(dayJson['dayIndex'] as int);
+    }
+
+    // Merge changes into existing plan
+    final modifiedPlan = _mergePlanChanges(currentPlan, sanitizedResult);
 
     // Validate
     modifiedPlan.validate();
 
-    // Update local cache
+    // Update local cache (full plan)
     await _localDatasource.savePlan(userId, modifiedPlan);
 
-    // Sync to remote
+    // Sync the merged days to remote (not the raw AI response)
     try {
-      await _remoteDatasource.savePlan(userId, modifiedPlan);
+      await _syncMergedDays(
+        userId,
+        currentPlan.id,
+        modifiedPlan,
+        affectedDayIndices,
+      );
     } catch (e) {
       logger.w('Failed to sync modified plan', error: e);
     }
 
     return modifiedPlan;
+  }
+
+  /// Applies pre-computed partial modifications to the current plan.
+  ///
+  /// This method is called by ChatRepository after receiving AI modifications.
+  /// It skips the AI call (already done) and directly applies the changes.
+  ///
+  /// Parameters:
+  /// - [userId]: ID of the user
+  /// - [currentPlan]: The current plan to modify
+  /// - [modificationData]: Pre-computed modification data from AI containing
+  ///   'modifiedDays' and 'modificationType'
+  ///
+  /// Throws:
+  /// - [StateError] if modification data is invalid
+  ///
+  /// Example:
+  /// ```dart
+  /// await repository.applyPartialModification(
+  ///   userId,
+  ///   currentPlan,
+  ///   {'modifiedDays': [...], 'modificationType': 'mealUpdate'},
+  /// );
+  /// ```
+  Future<WeeklyPlan> applyPartialModification(
+    String userId,
+    WeeklyPlan currentPlan,
+    Map<String, dynamic> modificationData,
+  ) async {
+    // Validate modification data
+    if (!modificationData.containsKey('modifiedDays')) {
+      throw StateError('Modification data missing modifiedDays');
+    }
+
+    // Sanitize the AI response to handle type mismatches and wrong field names
+    final sanitizedData = _sanitizeModificationResponse(modificationData);
+
+    // Extract affected day indices before merging
+    final modifiedDays = sanitizedData['modifiedDays'] as List<dynamic>;
+    final affectedDayIndices = <int>[];
+    for (final dayJson in modifiedDays) {
+      affectedDayIndices.add(dayJson['dayIndex'] as int);
+    }
+
+    // Merge changes into existing plan
+    final modifiedPlan = _mergePlanChanges(currentPlan, sanitizedData);
+
+    // Validate
+    modifiedPlan.validate();
+
+    // Update local cache (full plan)
+    await _localDatasource.savePlan(userId, modifiedPlan);
+
+    // Sync the merged days to remote (not the raw AI response)
+    try {
+      await _syncMergedDays(
+        userId,
+        currentPlan.id,
+        modifiedPlan,
+        affectedDayIndices,
+      );
+    } catch (e) {
+      logger.w('Failed to sync modified plan to remote', error: e);
+    }
+
+    return modifiedPlan;
+  }
+
+  /// Merges partial changes from AI response into the existing plan.
+  ///
+  /// Creates a new WeeklyPlan with smart merging at meal/workout level.
+  /// For mealUpdate: only updates specific meals, preserves others
+  /// For workoutUpdate: only updates workout, preserves meals
+  /// For dayReplacement: replaces entire day
+  WeeklyPlan _mergePlanChanges(
+    WeeklyPlan currentPlan,
+    Map<String, dynamic> changes,
+  ) {
+    final modifiedDays = changes['modifiedDays'] as List<dynamic>;
+    final modificationType =
+        changes['modificationType'] as String? ?? 'dayReplacement';
+
+    // Create a mutable copy of the days list
+    final updatedDays = List<DayPlan>.from(currentPlan.days);
+
+    // Process each modified day
+    for (final dayJson in modifiedDays) {
+      final dayIndex = dayJson['dayIndex'] as int;
+      final existingDay = currentPlan.days[dayIndex];
+
+      // Preserve existing day's id if not provided
+      if (!dayJson.containsKey('id') || dayJson['id'] == null) {
+        dayJson['id'] = existingDay.id;
+      }
+
+      // Preserve date if not provided
+      if (!dayJson.containsKey('date') || dayJson['date'] == null) {
+        dayJson['date'] = existingDay.date.toIso8601String();
+      }
+
+      DayPlan mergedDay;
+
+      if (modificationType == 'mealUpdate') {
+        // Merge meals: only update specific meals that are in the response
+        mergedDay = _mergeMeals(existingDay, dayJson as Map<String, dynamic>);
+      } else if (modificationType == 'workoutUpdate') {
+        // Merge workout: update workout, preserve meals
+        mergedDay = _mergeWorkout(existingDay, dayJson as Map<String, dynamic>);
+      } else {
+        // dayReplacement: replace entire day
+        mergedDay = DayPlan.fromJson(dayJson as Map<String, dynamic>);
+      }
+
+      updatedDays[dayIndex] = mergedDay;
+    }
+
+    // Create new plan with updated days
+    return currentPlan.copyWith(days: updatedDays);
+  }
+
+  /// Merges only the meals from the AI response into the existing day.
+  ///
+  /// Matches meals by type (breakfast, lunch, dinner, snack) and only
+  /// updates those that are explicitly provided in the response.
+  DayPlan _mergeMeals(DayPlan existingDay, Map<String, dynamic> dayJson) {
+    final updatedMeals = List<Meal>.from(existingDay.meals);
+    final newMealsJson = dayJson['meals'] as List<dynamic>?;
+
+    if (newMealsJson != null && newMealsJson.isNotEmpty) {
+      for (final mealJson in newMealsJson) {
+        final mealMap = mealJson as Map<String, dynamic>;
+        final newMeal = Meal.fromJson(mealMap);
+
+        // Find the existing meal of the same type and replace it
+        final existingIndex = updatedMeals.indexWhere(
+          (m) => m.type == newMeal.type,
+        );
+
+        if (existingIndex >= 0) {
+          // Replace the existing meal of the same type
+          updatedMeals[existingIndex] = newMeal;
+        } else {
+          // Add as new meal if no matching type found
+          updatedMeals.add(newMeal);
+        }
+      }
+    }
+
+    return existingDay.copyWith(meals: updatedMeals);
+  }
+
+  /// Merges only the workout from the AI response into the existing day.
+  ///
+  /// For workoutUpdate modifications:
+  /// - Preserves existing exercises
+  /// - Adds new exercises from the AI response
+  /// - Updates existing exercises if they match by ID
+  /// - Updates workout metadata (name, duration) from AI response
+  DayPlan _mergeWorkout(DayPlan existingDay, Map<String, dynamic> dayJson) {
+    final workoutJson = dayJson['workout'] as Map<String, dynamic>?;
+
+    if (workoutJson == null) {
+      return existingDay;
+    }
+
+    final existingWorkout = existingDay.workout;
+    if (existingWorkout == null) {
+      // No existing workout, just use the new one
+      final newWorkout = Workout.fromJson(workoutJson);
+      return existingDay.copyWith(workout: newWorkout);
+    }
+
+    // Get new exercises from AI response
+    final newExercisesJson = workoutJson['exercises'] as List<dynamic>?;
+    if (newExercisesJson == null || newExercisesJson.isEmpty) {
+      // No new exercises, just update workout metadata
+      final updatedWorkout = existingWorkout.copyWith(
+        name: workoutJson['name'] as String? ?? existingWorkout.name,
+        durationMinutes:
+            workoutJson['durationMinutes'] as int? ??
+            existingWorkout.durationMinutes,
+      );
+      return existingDay.copyWith(workout: updatedWorkout);
+    }
+
+    // Start with existing exercises
+    final mergedExercises = List<Exercise>.from(existingWorkout.exercises);
+
+    // Process new exercises from AI
+    for (final newExJson in newExercisesJson) {
+      if (newExJson is! Map<String, dynamic>) continue;
+
+      final newExercise = Exercise.fromJson(newExJson);
+      final existingIndex = mergedExercises.indexWhere(
+        (e) => e.id == newExercise.id,
+      );
+
+      if (existingIndex >= 0) {
+        // Update existing exercise by ID
+        mergedExercises[existingIndex] = newExercise;
+      } else {
+        // Add new exercise
+        mergedExercises.add(newExercise);
+      }
+    }
+
+    // Create merged workout with updated exercises and metadata
+    final mergedWorkout = existingWorkout.copyWith(
+      name: workoutJson['name'] as String? ?? existingWorkout.name,
+      durationMinutes:
+          workoutJson['durationMinutes'] as int? ??
+          existingWorkout.durationMinutes,
+      exercises: mergedExercises,
+    );
+
+    return existingDay.copyWith(workout: mergedWorkout);
+  }
+
+  /// Syncs the merged days to Firestore.
+  ///
+  /// This method syncs the complete merged day data, ensuring that
+  /// Firestore gets the full day with all meals/workouts preserved.
+  Future<void> _syncMergedDays(
+    String userId,
+    String planId,
+    WeeklyPlan modifiedPlan,
+    List<int> affectedDayIndices,
+  ) async {
+    // Build day updates map: dayIndex -> complete day data
+    final dayUpdates = <int, Map<String, dynamic>>{};
+
+    for (final dayIndex in affectedDayIndices) {
+      final mergedDay = modifiedPlan.days[dayIndex];
+      dayUpdates[dayIndex] = mergedDay.toJson();
+    }
+
+    // Perform partial update with complete merged day data
+    await _remoteDatasource.updateDays(userId, planId, dayUpdates);
   }
 
   /// Forces synchronization of local plan to Firestore.
@@ -551,6 +807,147 @@ class PlanRepository {
       date.month,
       date.day,
     ).subtract(Duration(days: daysFromMonday));
+  }
+
+  // ======================================================================
+  // AI RESPONSE SANITIZATION
+  // ======================================================================
+
+  /// Sanitizes the modification response from AI before parsing.
+  ///
+  /// Handles common AI response issues:
+  /// - Null values for required fields
+  /// - Wrong field names (equipment → equipmentRequired, instructions → notes)
+  /// - Type mismatches (int → String for reps)
+  Map<String, dynamic> _sanitizeModificationResponse(
+    Map<String, dynamic> response,
+  ) {
+    if (!response.containsKey('modifiedDays')) {
+      return response;
+    }
+
+    final modifiedDays = response['modifiedDays'] as List<dynamic>;
+    final sanitizedDays = <Map<String, dynamic>>[];
+
+    for (final day in modifiedDays) {
+      if (day is Map<String, dynamic>) {
+        sanitizedDays.add(_sanitizeDayJson(day));
+      }
+    }
+
+    return {...response, 'modifiedDays': sanitizedDays};
+  }
+
+  /// Sanitizes a day JSON object from AI response.
+  Map<String, dynamic> _sanitizeDayJson(Map<String, dynamic> day) {
+    final sanitized = Map<String, dynamic>.from(day);
+
+    // Sanitize workout if present
+    if (sanitized.containsKey('workout') && sanitized['workout'] != null) {
+      final workout = sanitized['workout'] as Map<String, dynamic>;
+      sanitized['workout'] = _sanitizeWorkoutJson(workout);
+    }
+
+    // Sanitize meals if present
+    if (sanitized.containsKey('meals') && sanitized['meals'] != null) {
+      final meals = sanitized['meals'] as List<dynamic>;
+      sanitized['meals'] = meals.map((meal) {
+        if (meal is Map<String, dynamic>) {
+          return _sanitizeMealJson(meal);
+        }
+        return meal;
+      }).toList();
+    }
+
+    return sanitized;
+  }
+
+  /// Sanitizes a workout JSON object from AI response.
+  Map<String, dynamic> _sanitizeWorkoutJson(Map<String, dynamic> workout) {
+    final sanitized = Map<String, dynamic>.from(workout);
+
+    // Sanitize exercises if present
+    if (sanitized.containsKey('exercises') && sanitized['exercises'] != null) {
+      final exercises = sanitized['exercises'] as List<dynamic>;
+      sanitized['exercises'] = exercises.map((exercise) {
+        if (exercise is Map<String, dynamic>) {
+          return _sanitizeExerciseJson(exercise);
+        }
+        return exercise;
+      }).toList();
+    }
+
+    return sanitized;
+  }
+
+  /// Sanitizes an exercise JSON object from AI response.
+  ///
+  /// Fixes common issues:
+  /// - Null or missing sets → defaults to 1
+  /// - Null, missing, or int reps → defaults to "1" or converts int to String
+  /// - Null or missing restSeconds → defaults to 60
+  /// - "equipment" field → renamed to "equipmentRequired"
+  /// - "instructions" field → renamed to "notes"
+  Map<String, dynamic> _sanitizeExerciseJson(Map<String, dynamic> exercise) {
+    final sanitized = Map<String, dynamic>.from(exercise);
+
+    // Handle sets: null or missing → default to 1
+    if (sanitized['sets'] == null) {
+      sanitized['sets'] = 1;
+    }
+
+    // Handle reps: null, missing, or int → convert to String
+    if (sanitized['reps'] == null) {
+      sanitized['reps'] = '1';
+    } else if (sanitized['reps'] is int) {
+      sanitized['reps'] = sanitized['reps'].toString();
+    } else if (sanitized['reps'] is! String) {
+      sanitized['reps'] = sanitized['reps'].toString();
+    }
+
+    // Handle restSeconds: null or missing → default to 60
+    if (sanitized['restSeconds'] == null) {
+      sanitized['restSeconds'] = 60;
+    }
+
+    // Rename "equipment" → "equipmentRequired" if needed
+    if (sanitized.containsKey('equipment') &&
+        !sanitized.containsKey('equipmentRequired')) {
+      sanitized['equipmentRequired'] = sanitized['equipment'];
+      sanitized.remove('equipment');
+    }
+
+    // Rename "instructions" → "notes" if needed
+    if (sanitized.containsKey('instructions') &&
+        !sanitized.containsKey('notes')) {
+      sanitized['notes'] = sanitized['instructions'];
+      sanitized.remove('instructions');
+    }
+
+    // Ensure equipmentRequired is a list
+    if (!sanitized.containsKey('equipmentRequired') ||
+        sanitized['equipmentRequired'] == null) {
+      sanitized['equipmentRequired'] = <String>[];
+    }
+
+    return sanitized;
+  }
+
+  /// Sanitizes a meal JSON object from AI response.
+  ///
+  /// Fixes common issues:
+  /// - Null numeric values (calories, protein, carbs, fat) → defaults to 0
+  /// - "instructions" field (Meal uses this correctly, but ensure present)
+  Map<String, dynamic> _sanitizeMealJson(Map<String, dynamic> meal) {
+    final sanitized = Map<String, dynamic>.from(meal);
+
+    // Handle null numeric values with defaults
+    sanitized['calories'] ??= 0;
+    sanitized['protein'] ??= 0;
+    sanitized['carbs'] ??= 0;
+    sanitized['fat'] ??= 0;
+
+    return sanitized;
   }
 
   // ======================================================================
