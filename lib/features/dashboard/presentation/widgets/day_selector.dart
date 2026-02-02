@@ -85,7 +85,7 @@ class DaySelector extends ConsumerWidget {
             border: Border(
               bottom: BorderSide(
                 color: context.colorScheme.outlineVariant.withValues(
-                  alpha: 0.5,
+                  alpha: 0.3,
                 ),
                 width: 1,
               ),
@@ -119,7 +119,7 @@ class DaySelector extends ConsumerWidget {
           color: context.colorScheme.surface,
           border: Border(
             bottom: BorderSide(
-              color: context.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              color: context.colorScheme.outlineVariant.withValues(alpha: 0.3),
               width: 1,
             ),
           ),

@@ -72,7 +72,7 @@ class TodayHeader extends ConsumerWidget {
         color: context.colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: context.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            color: context.colorScheme.outlineVariant.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
