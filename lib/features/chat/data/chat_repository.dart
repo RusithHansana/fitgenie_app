@@ -463,9 +463,6 @@ class ChatRepository {
           },
         );
 
-    // Log the AI response for debugging
-    logger.i('AI modification response: $modifiedPlanData');
-
     // Check for rejection
     if (modifiedPlanData['modificationType'] == 'rejected') {
       final explanation =
