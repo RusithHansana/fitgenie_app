@@ -273,6 +273,12 @@ class _PlanGenerationScreenState extends ConsumerState<PlanGenerationScreen> {
         return AppStrings.errorAiContentFiltered;
       case AiErrorType.invalidRequest:
         return 'This type of modification is not supported. Try changing specific days or meals instead.';
+      case AiErrorType.localRpmExceeded:
+        return 'Too many requests. Please wait a minute before trying again.';
+      case AiErrorType.localRpdExceeded:
+        return 'Daily request limit reached. Please try again tomorrow.';
+      case AiErrorType.localTokensExceeded:
+        return 'Daily usage limit reached. Please try again tomorrow.';
       case AiErrorType.unknown:
         return AppStrings.errorUnknown;
     }
