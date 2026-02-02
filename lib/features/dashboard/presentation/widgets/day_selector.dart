@@ -79,7 +79,7 @@ class DaySelector extends ConsumerWidget {
         ];
 
         return Container(
-          height: 90,
+          height: 95,
           decoration: BoxDecoration(
             color: context.colorScheme.surface,
             border: Border(
@@ -114,7 +114,7 @@ class DaySelector extends ConsumerWidget {
         );
       },
       loading: () => Container(
-        height: 90,
+        height: 95,
         decoration: BoxDecoration(
           color: context.colorScheme.surface,
           border: Border(
