@@ -224,7 +224,7 @@ class AppTheme {
 
       // Chip theme
       chipTheme: ChipThemeData(
-        backgroundColor: colorScheme.surfaceContainerHighest,
+        backgroundColor: colorScheme.surfaceContainerHigh,
         selectedColor: colorScheme.secondaryContainer,
         disabledColor: colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.5,
@@ -232,7 +232,6 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         ),
-        labelStyle: AppTextStyles.textTheme.labelLarge,
         padding: const EdgeInsets.symmetric(
           horizontal: AppSizes.spacingMd,
           vertical: AppSizes.spacingSm,
@@ -525,9 +524,16 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         ),
-        labelStyle: AppTextStyles.textTheme.labelLarge?.copyWith(
-          color: colorScheme.onSurface,
-        ),
+        labelStyle: WidgetStateTextStyle.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppTextStyles.textTheme.labelLarge!.copyWith(
+              color: colorScheme.onSecondaryContainer,
+            );
+          }
+          return AppTextStyles.textTheme.labelLarge!.copyWith(
+            color: colorScheme.onSurface,
+          );
+        }),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSizes.spacingMd,
           vertical: AppSizes.spacingSm,

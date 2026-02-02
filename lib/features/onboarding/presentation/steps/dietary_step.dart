@@ -369,9 +369,12 @@ class _DietaryStepState extends ConsumerState<DietaryStep> {
           Text(restriction.displayName),
         ],
       ),
+      labelStyle: TextStyle(
+        color: isSelected
+            ? colorScheme.onSecondaryContainer
+            : colorScheme.onSurface,
+      ),
       onSelected: (_) => _toggleRestriction(restriction),
-      backgroundColor: colorScheme.surface,
-      selectedColor: colorScheme.primaryContainer,
       showCheckmark: true,
       side: BorderSide(
         color: isSelected
