@@ -1,3 +1,4 @@
+import 'package:fitgenie_app/core/extensions/context_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -191,6 +192,7 @@ class _AppTextFieldState extends State<AppTextField> {
         prefixIcon: widget.prefixIcon != null ? Icon(widget.prefixIcon) : null,
         suffixIcon: _buildSuffixIcon(),
         enabled: widget.enabled,
+        fillColor: context.colorScheme.surfaceContainer,
         // Counter is automatically added by TextFormField when maxLength is set
       ),
       obscureText: widget.obscureText && _isObscured,

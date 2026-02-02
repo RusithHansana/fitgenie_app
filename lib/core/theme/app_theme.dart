@@ -276,8 +276,12 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusLg),
         ),
-        titleTextStyle: AppTextStyles.textTheme.headlineSmall,
-        contentTextStyle: AppTextStyles.textTheme.bodyMedium,
+        titleTextStyle: AppTextStyles.textTheme.headlineSmall?.copyWith(
+          color: colorScheme.onSurface,
+        ),
+        contentTextStyle: AppTextStyles.textTheme.bodyLarge?.copyWith(
+          color: colorScheme.onSurface,
+        ),
       ),
 
       // Bottom sheet theme
@@ -521,7 +525,9 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         ),
-        labelStyle: AppTextStyles.textTheme.labelLarge,
+        labelStyle: AppTextStyles.textTheme.labelLarge?.copyWith(
+          color: colorScheme.onSurface,
+        ),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSizes.spacingMd,
           vertical: AppSizes.spacingSm,
@@ -565,8 +571,12 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusLg),
         ),
-        titleTextStyle: AppTextStyles.textTheme.headlineSmall,
-        contentTextStyle: AppTextStyles.textTheme.bodyMedium,
+        titleTextStyle: AppTextStyles.textTheme.headlineSmall?.copyWith(
+          color: colorScheme.onSurface,
+        ),
+        contentTextStyle: AppTextStyles.textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onSurface,
+        ),
       ),
 
       // Bottom sheet theme
