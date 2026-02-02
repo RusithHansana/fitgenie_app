@@ -417,7 +417,18 @@ Output must be minified JSON with no extra whitespace, line breaks, or indentati
         "name": "Updated Workout Name",
         "type": "strength|cardio|flexibility|rest",
         "durationMinutes": 45,
-        "exercises": [...]
+        "exercises": [
+          {
+            "id": "unique-exercise-id",
+            "name": "Exercise Name",
+            "sets": 3,
+            "reps": "10-12",
+            "restSeconds": 90,
+            "notes": "Form cues and tips",
+            "equipmentRequired": ["dumbbells"],
+            "isComplete": false
+          }
+        ]
       },
       "meals": [
         {
@@ -428,9 +439,9 @@ Output must be minified JSON with no extra whitespace, line breaks, or indentati
           "protein": 30,
           "carbs": 50,
           "fat": 15,
-          "ingredients": [...],
-          "instructions": "...",
-          "dietaryInfo": [...],
+          "ingredients": ["1 cup ingredient"],
+          "instructions": "Brief preparation steps",
+          "dietaryInfo": ["Vegetarian"],
           "isComplete": false
         }
       ]
@@ -438,6 +449,23 @@ Output must be minified JSON with no extra whitespace, line breaks, or indentati
   ],
   "explanation": "Changed Tuesday's lunch to a vegetarian stir-fry"
 }
+
+=== EXERCISE FIELD REQUIREMENTS ===
+CRITICAL: Each exercise MUST include these fields with exact names and types:
+- "id": String (unique identifier)
+- "name": String (exercise name)
+- "sets": Integer (number of sets, use 1 for time-based exercises)
+- "reps": String (rep count or duration, e.g., "10-12" or "30 seconds")
+- "restSeconds": Integer (rest between sets in seconds, use 60 as default)
+- "notes": String or null (form cues)
+- "equipmentRequired": Array of strings (e.g., ["dumbbells"] or ["bodyweight"])
+- "isComplete": false
+
+DO NOT use these wrong field names:
+- "equipment" → use "equipmentRequired"
+- "instructions" → use "notes"
+- "weight" → not needed
+- "durationMinutes" → not needed for exercises
 
 === MODIFICATION TYPES ===
 - dayReplacement: Entire day(s) are being replaced (workout + meals)
@@ -447,8 +475,12 @@ Output must be minified JSON with no extra whitespace, line breaks, or indentati
 
 === NOTES ===
 - For mealUpdate: only include the changed meals in the meals array
-- For workoutUpdate: only include days with workout changes
-- Preserve existing IDs when updating (don't generate new IDs)
+- For workoutUpdate: only include NEWLY ADDED exercises in the exercises array
+  * Do NOT include existing exercises in the response
+  * Do NOT summarize or condense existing exercises
+  * The app will automatically merge new exercises with existing ones
+- Preserve existing IDs when updating items (don't generate new IDs for existing items)
+- Generate new unique IDs for newly added exercises/meals
 - Set isComplete to false for any new/modified exercises or meals
 
 Generate the partial modification response now:
@@ -552,19 +584,23 @@ Generate the modified plan now:
 
     for (final day in plan.days) {
       buffer.writeln('${day.dayName} (dayIndex: ${day.dayIndex}):');
-      
+
       // Workout info
       if (day.workout != null && day.workout!.type != WorkoutType.rest) {
-        buffer.writeln('  Workout: ${day.workout!.name} (${day.workout!.type.name}, ${day.workout!.durationMinutes}min)');
+        buffer.writeln(
+          '  Workout: ${day.workout!.name} (${day.workout!.type.name}, ${day.workout!.durationMinutes}min)',
+        );
       } else {
         buffer.writeln('  Workout: Rest Day');
       }
-      
+
       // Meals summary
       for (final meal in day.meals) {
-        buffer.writeln('  ${meal.type.name}: ${meal.name} (${meal.calories} cal)');
+        buffer.writeln(
+          '  ${meal.type.name}: ${meal.name} (${meal.calories} cal)',
+        );
       }
-      
+
       buffer.writeln();
     }
 

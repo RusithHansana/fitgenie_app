@@ -460,15 +460,18 @@ class PlanRepository {
       );
     }
 
+    // Sanitize the AI response to handle type mismatches and wrong field names
+    final sanitizedResult = _sanitizeModificationResponse(resultJson);
+
     // Extract affected day indices before merging
-    final modifiedDays = resultJson['modifiedDays'] as List<dynamic>;
+    final modifiedDays = sanitizedResult['modifiedDays'] as List<dynamic>;
     final affectedDayIndices = <int>[];
     for (final dayJson in modifiedDays) {
       affectedDayIndices.add(dayJson['dayIndex'] as int);
     }
 
     // Merge changes into existing plan
-    final modifiedPlan = _mergePlanChanges(currentPlan, resultJson);
+    final modifiedPlan = _mergePlanChanges(currentPlan, sanitizedResult);
 
     // Validate
     modifiedPlan.validate();
@@ -523,15 +526,18 @@ class PlanRepository {
       throw StateError('Modification data missing modifiedDays');
     }
 
+    // Sanitize the AI response to handle type mismatches and wrong field names
+    final sanitizedData = _sanitizeModificationResponse(modificationData);
+
     // Extract affected day indices before merging
-    final modifiedDays = modificationData['modifiedDays'] as List<dynamic>;
+    final modifiedDays = sanitizedData['modifiedDays'] as List<dynamic>;
     final affectedDayIndices = <int>[];
     for (final dayJson in modifiedDays) {
       affectedDayIndices.add(dayJson['dayIndex'] as int);
     }
 
     // Merge changes into existing plan
-    final modifiedPlan = _mergePlanChanges(currentPlan, modificationData);
+    final modifiedPlan = _mergePlanChanges(currentPlan, sanitizedData);
 
     // Validate
     modifiedPlan.validate();
@@ -639,16 +645,69 @@ class PlanRepository {
 
   /// Merges only the workout from the AI response into the existing day.
   ///
-  /// Updates the workout while preserving the existing meals.
+  /// For workoutUpdate modifications:
+  /// - Preserves existing exercises
+  /// - Adds new exercises from the AI response
+  /// - Updates existing exercises if they match by ID
+  /// - Updates workout metadata (name, duration) from AI response
   DayPlan _mergeWorkout(DayPlan existingDay, Map<String, dynamic> dayJson) {
     final workoutJson = dayJson['workout'] as Map<String, dynamic>?;
 
-    if (workoutJson != null) {
+    if (workoutJson == null) {
+      return existingDay;
+    }
+
+    final existingWorkout = existingDay.workout;
+    if (existingWorkout == null) {
+      // No existing workout, just use the new one
       final newWorkout = Workout.fromJson(workoutJson);
       return existingDay.copyWith(workout: newWorkout);
     }
 
-    return existingDay;
+    // Get new exercises from AI response
+    final newExercisesJson = workoutJson['exercises'] as List<dynamic>?;
+    if (newExercisesJson == null || newExercisesJson.isEmpty) {
+      // No new exercises, just update workout metadata
+      final updatedWorkout = existingWorkout.copyWith(
+        name: workoutJson['name'] as String? ?? existingWorkout.name,
+        durationMinutes:
+            workoutJson['durationMinutes'] as int? ??
+            existingWorkout.durationMinutes,
+      );
+      return existingDay.copyWith(workout: updatedWorkout);
+    }
+
+    // Start with existing exercises
+    final mergedExercises = List<Exercise>.from(existingWorkout.exercises);
+
+    // Process new exercises from AI
+    for (final newExJson in newExercisesJson) {
+      if (newExJson is! Map<String, dynamic>) continue;
+
+      final newExercise = Exercise.fromJson(newExJson);
+      final existingIndex = mergedExercises.indexWhere(
+        (e) => e.id == newExercise.id,
+      );
+
+      if (existingIndex >= 0) {
+        // Update existing exercise by ID
+        mergedExercises[existingIndex] = newExercise;
+      } else {
+        // Add new exercise
+        mergedExercises.add(newExercise);
+      }
+    }
+
+    // Create merged workout with updated exercises and metadata
+    final mergedWorkout = existingWorkout.copyWith(
+      name: workoutJson['name'] as String? ?? existingWorkout.name,
+      durationMinutes:
+          workoutJson['durationMinutes'] as int? ??
+          existingWorkout.durationMinutes,
+      exercises: mergedExercises,
+    );
+
+    return existingDay.copyWith(workout: mergedWorkout);
   }
 
   /// Syncs the merged days to Firestore.
@@ -748,6 +807,147 @@ class PlanRepository {
       date.month,
       date.day,
     ).subtract(Duration(days: daysFromMonday));
+  }
+
+  // ======================================================================
+  // AI RESPONSE SANITIZATION
+  // ======================================================================
+
+  /// Sanitizes the modification response from AI before parsing.
+  ///
+  /// Handles common AI response issues:
+  /// - Null values for required fields
+  /// - Wrong field names (equipment → equipmentRequired, instructions → notes)
+  /// - Type mismatches (int → String for reps)
+  Map<String, dynamic> _sanitizeModificationResponse(
+    Map<String, dynamic> response,
+  ) {
+    if (!response.containsKey('modifiedDays')) {
+      return response;
+    }
+
+    final modifiedDays = response['modifiedDays'] as List<dynamic>;
+    final sanitizedDays = <Map<String, dynamic>>[];
+
+    for (final day in modifiedDays) {
+      if (day is Map<String, dynamic>) {
+        sanitizedDays.add(_sanitizeDayJson(day));
+      }
+    }
+
+    return {...response, 'modifiedDays': sanitizedDays};
+  }
+
+  /// Sanitizes a day JSON object from AI response.
+  Map<String, dynamic> _sanitizeDayJson(Map<String, dynamic> day) {
+    final sanitized = Map<String, dynamic>.from(day);
+
+    // Sanitize workout if present
+    if (sanitized.containsKey('workout') && sanitized['workout'] != null) {
+      final workout = sanitized['workout'] as Map<String, dynamic>;
+      sanitized['workout'] = _sanitizeWorkoutJson(workout);
+    }
+
+    // Sanitize meals if present
+    if (sanitized.containsKey('meals') && sanitized['meals'] != null) {
+      final meals = sanitized['meals'] as List<dynamic>;
+      sanitized['meals'] = meals.map((meal) {
+        if (meal is Map<String, dynamic>) {
+          return _sanitizeMealJson(meal);
+        }
+        return meal;
+      }).toList();
+    }
+
+    return sanitized;
+  }
+
+  /// Sanitizes a workout JSON object from AI response.
+  Map<String, dynamic> _sanitizeWorkoutJson(Map<String, dynamic> workout) {
+    final sanitized = Map<String, dynamic>.from(workout);
+
+    // Sanitize exercises if present
+    if (sanitized.containsKey('exercises') && sanitized['exercises'] != null) {
+      final exercises = sanitized['exercises'] as List<dynamic>;
+      sanitized['exercises'] = exercises.map((exercise) {
+        if (exercise is Map<String, dynamic>) {
+          return _sanitizeExerciseJson(exercise);
+        }
+        return exercise;
+      }).toList();
+    }
+
+    return sanitized;
+  }
+
+  /// Sanitizes an exercise JSON object from AI response.
+  ///
+  /// Fixes common issues:
+  /// - Null or missing sets → defaults to 1
+  /// - Null, missing, or int reps → defaults to "1" or converts int to String
+  /// - Null or missing restSeconds → defaults to 60
+  /// - "equipment" field → renamed to "equipmentRequired"
+  /// - "instructions" field → renamed to "notes"
+  Map<String, dynamic> _sanitizeExerciseJson(Map<String, dynamic> exercise) {
+    final sanitized = Map<String, dynamic>.from(exercise);
+
+    // Handle sets: null or missing → default to 1
+    if (sanitized['sets'] == null) {
+      sanitized['sets'] = 1;
+    }
+
+    // Handle reps: null, missing, or int → convert to String
+    if (sanitized['reps'] == null) {
+      sanitized['reps'] = '1';
+    } else if (sanitized['reps'] is int) {
+      sanitized['reps'] = sanitized['reps'].toString();
+    } else if (sanitized['reps'] is! String) {
+      sanitized['reps'] = sanitized['reps'].toString();
+    }
+
+    // Handle restSeconds: null or missing → default to 60
+    if (sanitized['restSeconds'] == null) {
+      sanitized['restSeconds'] = 60;
+    }
+
+    // Rename "equipment" → "equipmentRequired" if needed
+    if (sanitized.containsKey('equipment') &&
+        !sanitized.containsKey('equipmentRequired')) {
+      sanitized['equipmentRequired'] = sanitized['equipment'];
+      sanitized.remove('equipment');
+    }
+
+    // Rename "instructions" → "notes" if needed
+    if (sanitized.containsKey('instructions') &&
+        !sanitized.containsKey('notes')) {
+      sanitized['notes'] = sanitized['instructions'];
+      sanitized.remove('instructions');
+    }
+
+    // Ensure equipmentRequired is a list
+    if (!sanitized.containsKey('equipmentRequired') ||
+        sanitized['equipmentRequired'] == null) {
+      sanitized['equipmentRequired'] = <String>[];
+    }
+
+    return sanitized;
+  }
+
+  /// Sanitizes a meal JSON object from AI response.
+  ///
+  /// Fixes common issues:
+  /// - Null numeric values (calories, protein, carbs, fat) → defaults to 0
+  /// - "instructions" field (Meal uses this correctly, but ensure present)
+  Map<String, dynamic> _sanitizeMealJson(Map<String, dynamic> meal) {
+    final sanitized = Map<String, dynamic>.from(meal);
+
+    // Handle null numeric values with defaults
+    sanitized['calories'] ??= 0;
+    sanitized['protein'] ??= 0;
+    sanitized['carbs'] ??= 0;
+    sanitized['fat'] ??= 0;
+
+    return sanitized;
   }
 
   // ======================================================================
