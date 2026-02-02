@@ -2,6 +2,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:logger/logger.dart';
 import 'package:fitgenie_app/core/config/app_config.dart';
 import 'package:fitgenie_app/core/constants/ai_constants.dart';
+import 'package:fitgenie_app/core/constants/rate_limit_config.dart';
 import 'package:fitgenie_app/core/exceptions/ai_exception.dart';
 import 'package:fitgenie_app/core/utils/json_parser.dart';
 import 'package:fitgenie_app/core/utils/retry_helper.dart';
@@ -83,11 +84,8 @@ class GeminiService {
   /// Whether the model has been initialized.
   bool _isInitialized = false;
 
-  /// Rate limiter to keep Gemini requests under 5 RPM.
-  static final RateLimiter _rateLimiter = RateLimiter(
-    maxRequests: 4,
-    window: const Duration(minutes: 1),
-  );
+  /// Rate limiter singleton instance.
+  static final RateLimiter _rateLimiter = RateLimiter();
 
   /// Initializes the Gemini model with configuration.
   ///
@@ -287,10 +285,38 @@ class GeminiService {
       );
     }
 
-    try {
-      // Enforce request rate limiting
-      await _rateLimiter.acquire();
+    // Estimate tokens for the prompt
+    final estimatedTokens = RateLimitConfig.estimateTokens(prompt);
 
+    // Pre-check rate limits before making request
+    final limitCheck = _rateLimiter.canMakeRequest(
+      estimatedTokens: estimatedTokens,
+    );
+
+    if (limitCheck != RateLimitExceeded.none) {
+      logger.w('Rate limit would be exceeded: $limitCheck');
+      switch (limitCheck) {
+        case RateLimitExceeded.rpm:
+          throw const AiException(
+            AiErrorType.localRpmExceeded,
+            'Requests per minute limit reached',
+          );
+        case RateLimitExceeded.rpd:
+          throw const AiException(
+            AiErrorType.localRpdExceeded,
+            'Daily request limit reached',
+          );
+        case RateLimitExceeded.tokens:
+          throw const AiException(
+            AiErrorType.localTokensExceeded,
+            'Daily token limit reached',
+          );
+        case RateLimitExceeded.none:
+          break; // Should not happen
+      }
+    }
+
+    try {
       // Generate content with timeout
       final response = await _model
           .generateContent([Content.text(prompt)])
@@ -340,6 +366,14 @@ class GeminiService {
             _validatePartialModificationJson(jsonMap);
             break;
         }
+
+        // Record successful request with token usage
+        await _rateLimiter.recordRequest(tokensUsed: estimatedTokens);
+        logger.d(
+          'Request recorded: ~$estimatedTokens tokens, '
+          'daily: ${_rateLimiter.dailyRequestCount}/${RateLimitConfig.effectiveRpd} requests, '
+          '${_rateLimiter.dailyTokensUsed}/${RateLimitConfig.effectiveMaxTokens} tokens',
+        );
 
         return jsonMap;
       } on AiException {
@@ -526,7 +560,12 @@ class GeminiService {
     }
 
     final modificationType = json['modificationType'];
-    final validTypes = ['dayReplacement', 'workoutUpdate', 'mealUpdate', 'rejected'];
+    final validTypes = [
+      'dayReplacement',
+      'workoutUpdate',
+      'mealUpdate',
+      'rejected',
+    ];
     if (!validTypes.contains(modificationType)) {
       throw AiException(
         AiErrorType.invalidResponse,
@@ -683,10 +722,38 @@ class GeminiService {
       );
     }
 
-    try {
-      // Enforce request rate limiting
-      await _rateLimiter.acquire();
+    // Estimate tokens for the message
+    final estimatedTokens = RateLimitConfig.estimateTokens(message);
 
+    // Pre-check rate limits before making request
+    final limitCheck = _rateLimiter.canMakeRequest(
+      estimatedTokens: estimatedTokens,
+    );
+
+    if (limitCheck != RateLimitExceeded.none) {
+      logger.w('Rate limit would be exceeded: $limitCheck');
+      switch (limitCheck) {
+        case RateLimitExceeded.rpm:
+          throw const AiException(
+            AiErrorType.localRpmExceeded,
+            'Requests per minute limit reached',
+          );
+        case RateLimitExceeded.rpd:
+          throw const AiException(
+            AiErrorType.localRpdExceeded,
+            'Daily request limit reached',
+          );
+        case RateLimitExceeded.tokens:
+          throw const AiException(
+            AiErrorType.localTokensExceeded,
+            'Daily token limit reached',
+          );
+        case RateLimitExceeded.none:
+          break; // Should not happen
+      }
+    }
+
+    try {
       final response = await _model
           .generateContent([Content.text(message)])
           .timeout(
@@ -706,6 +773,9 @@ class GeminiService {
           'Empty response from Gemini',
         );
       }
+
+      // Record successful request with token usage
+      await _rateLimiter.recordRequest(tokensUsed: estimatedTokens);
 
       return text.trim();
     } on AiException {
