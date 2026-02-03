@@ -147,7 +147,7 @@ class _ChatInputState extends State<ChatInput> {
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Text input field
           Expanded(
@@ -166,7 +166,7 @@ class _ChatInputState extends State<ChatInput> {
                   color: colorScheme.onSurfaceVariant,
                 ),
                 filled: true,
-                fillColor: colorScheme.surfaceContainerHighest,
+                fillColor: colorScheme.surfaceContainer,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppSizes.radiusLg),
                   borderSide: BorderSide.none,
