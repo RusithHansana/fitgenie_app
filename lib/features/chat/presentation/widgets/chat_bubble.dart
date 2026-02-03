@@ -112,7 +112,8 @@ class ChatBubble extends StatelessWidget {
                   ),
 
                   // Status indicators (for modification requests)
-                  if (message.isModificationRequest) ...[
+                  // Only show for non-user messages to avoid stuck loading state
+                  if (message.isModificationRequest && !message.isUser) ...[
                     const SizedBox(height: AppSizes.spacingSm),
                     _buildStatusIndicator(context),
                   ],
