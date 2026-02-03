@@ -326,8 +326,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             Expanded(
               child: DropdownButtonFormField<WeightUnit>(
                 initialValue: _weightUnit,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.labelWeightUnit,
+                  fillColor: context.colorScheme.surfaceContainer,
                 ),
                 items: WeightUnit.values.map((unit) {
                   return DropdownMenuItem(
@@ -369,8 +370,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             Expanded(
               child: DropdownButtonFormField<HeightUnit>(
                 initialValue: _heightUnit,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.labelHeightUnit,
+                  fillColor: context.colorScheme.surfaceContainer,
                 ),
                 items: HeightUnit.values.map((unit) {
                   return DropdownMenuItem(
