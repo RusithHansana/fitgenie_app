@@ -112,7 +112,8 @@ class ChatBubble extends StatelessWidget {
                   ),
 
                   // Status indicators (for modification requests)
-                  if (message.isModificationRequest) ...[
+                  // Only show for non-user messages to avoid stuck loading state
+                  if (message.isModificationRequest && !message.isUser) ...[
                     const SizedBox(height: AppSizes.spacingSm),
                     _buildStatusIndicator(context),
                   ],
@@ -160,7 +161,7 @@ class ChatBubble extends StatelessWidget {
       case MessageRole.user:
         return colorScheme.primaryContainer;
       case MessageRole.assistant:
-        return colorScheme.surfaceContainerHighest;
+        return colorScheme.surfaceContainer;
       case MessageRole.system:
         return colorScheme.surfaceContainerHigh.withValues(alpha: 0.5);
     }
