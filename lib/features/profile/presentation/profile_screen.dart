@@ -77,7 +77,7 @@ class ProfileScreen extends ConsumerWidget {
                         profile: profile,
                         onEditPressed: () {
                           // Navigate to edit profile screen
-                          Navigator.of(context).pushNamed('/profile/edit');
+                          context.goToEditProfile();
                         },
                       ),
                       loading: () => Container(
@@ -108,7 +108,7 @@ class ProfileScreen extends ConsumerWidget {
                       error: (error, stack) => ProfileHeader(
                         user: user,
                         onEditPressed: () {
-                          Navigator.of(context).pushNamed('/profile/edit');
+                          context.goToEditProfile();
                         },
                       ),
                     ),
@@ -204,7 +204,7 @@ class ProfileScreen extends ConsumerWidget {
               leading: const Icon(Icons.edit_outlined),
               showChevron: true,
               onTap: () {
-                Navigator.of(context).pushNamed('/profile/edit');
+                context.goToEditProfile();
               },
             ),
             const SettingsDivider(
