@@ -160,7 +160,7 @@ class ChatBubble extends StatelessWidget {
       case MessageRole.user:
         return colorScheme.primaryContainer;
       case MessageRole.assistant:
-        return colorScheme.surfaceContainerHighest;
+        return colorScheme.surfaceContainer;
       case MessageRole.system:
         return colorScheme.surfaceContainerHigh.withValues(alpha: 0.5);
     }
