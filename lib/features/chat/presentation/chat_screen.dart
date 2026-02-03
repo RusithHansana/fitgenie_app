@@ -234,7 +234,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
 
           // Modification chips (quick actions)
-          ModificationChips(onChipTap: _handleSendMessage),
+          ModificationChips(
+            onChipTap: _handleSendMessage,
+            isEnabled: !isTyping,
+          ),
 
           // Chat input
           ChatInput(onSend: _handleSendMessage, isEnabled: !isTyping),

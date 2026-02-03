@@ -54,10 +54,20 @@ class ModificationChips extends ConsumerWidget {
   /// Receives the pre-defined message text to send.
   final ValueChanged<String> onChipTap;
 
+  /// Whether the chips are enabled for interaction.
+  ///
+  /// When false, chips are visually disabled and don't respond to taps.
+  /// Use this to prevent sending messages while AI is responding.
+  final bool isEnabled;
+
   /// Creates a ModificationChips widget.
   ///
   /// The [onChipTap] callback is required to handle chip selections.
-  const ModificationChips({super.key, required this.onChipTap});
+  const ModificationChips({
+    super.key,
+    required this.onChipTap,
+    this.isEnabled = true,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -94,9 +104,13 @@ class ModificationChips extends ConsumerWidget {
                 avatar: Icon(
                   suggestion.icon,
                   size: 18,
-                  color: colorScheme.onSurfaceVariant,
+                  color: isEnabled
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 ),
-                onPressed: () => onChipTap(suggestion.message),
+                onPressed: isEnabled
+                    ? () => onChipTap(suggestion.message)
+                    : null,
                 backgroundColor: colorScheme.surface,
                 side: BorderSide(color: colorScheme.outlineVariant, width: 1),
                 shape: RoundedRectangleBorder(
