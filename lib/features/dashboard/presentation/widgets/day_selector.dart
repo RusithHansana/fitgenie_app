@@ -256,10 +256,19 @@ class _DayButton extends ConsumerWidget {
               SizedBox(
                 height: 16,
                 child: isComplete
-                    ? Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: context.colorScheme.tertiary,
+                    ? Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: context.colorScheme.onPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.check_circle,
+                          size: 16,
+                          color: context.colorScheme.tertiary,
+                        ),
                       )
                     : const SizedBox.shrink(),
               ),
